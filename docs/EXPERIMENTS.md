@@ -76,7 +76,7 @@ The secret setting differs from the publicly-known settings only in one rotor's 
 | `first` | str | `A` | First candidate letter of the unknown rotor window |
 | `vary` | choice (right, middle, left) | `right` | Which rotor window is unknown |
 | `synthesis` | choice (auto, compiled, staged, factored) | `auto` | Oracle synthesis |
-| `oracle` | choice (phase, flag) | `phase` | Oracle style |
+| `oracle` | choice (phase, flag, compact) | `phase` | Oracle style (compact = hardware-runnable, classical crib check) |
 | `iterations` | int | `-1` | Grover iterations (-1 = optimal for one solution) |
 
 Default shots: 2000

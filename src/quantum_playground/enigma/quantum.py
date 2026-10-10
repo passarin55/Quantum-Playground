@@ -39,7 +39,7 @@ from .machine import (ABC, MINI_ABC, MINI_REFLECTOR, MINI_ROTORS, REFLECTORS, RO
                       letters, mini_permutation, mini_positions, encrypt, mini_encrypt)
 
 SYNTHESIS_MODES = ("auto", "compiled", "staged", "factored")
-ORACLE_MODES = ("phase", "flag")
+ORACLE_MODES = ("phase", "flag", "compact")
 
 
 def _inverse(p: Sequence[int]) -> tuple[int, ...]:
@@ -336,14 +336,49 @@ def _diffuser(qc: Circuit, key: Sequence[int]) -> None:
     qc.h(list(key))
 
 
+def build_compact_grover_circuit(problem: KeySearchProblem, iterations: Optional[int] = None,
+                                 measure: bool = True) -> Circuit:
+    """Hardware-friendly Grover oracle that marks classically-identified crib-satisfying keys.
+
+    Unlike the staged/factored/compiled oracles, this does NOT encrypt on quantum data: the
+    crib check is done classically (``problem.classical_matches()``), and the satisfying key
+    indices are marked with phase gates. It therefore compiles to only a handful of native
+    gates and runs on today's hardware — but it provides no quantum cryptanalytic speedup over
+    the classical scan (the scan already found the keys). It exists to demonstrate Grover
+    amplification itself on a real QPU.
+    """
+    marked = problem.classical_matches()
+    if not marked:
+        raise ValueError("No crib-satisfying key in the candidate set; nothing to amplify.")
+    if iterations is None:
+        iterations = optimal_iterations(problem.num_candidates, len(marked))
+    if not 0 <= iterations <= 8:
+        raise ValueError("Grover iterations: 0..8")
+    qc = Circuit(name=f"enigma_grover_{problem.model}_compact")
+    key = qc.add_qreg("k", problem.key_bits)
+    out = qc.add_creg("key", problem.key_bits) if measure else None
+    qc.h(list(key))
+    for _ in range(iterations):
+        for m in marked:
+            qc.phase_flip_on(list(key), m)
+        _diffuser(qc, list(key))
+    if measure:
+        qc.measure(list(key), out)
+    qc.metadata.update({"experiment": "enigma_grover", "synthesis": "none", "oracle": "compact",
+                        "iterations": iterations, "marked_keys": marked, **problem.describe()})
+    return qc
+
+
 def build_grover_circuit(problem: KeySearchProblem, iterations: Optional[int] = None,
                          synthesis: str = "auto", oracle: str = "phase", measure: bool = True) -> Circuit:
+    if oracle not in ORACLE_MODES:
+        raise ValueError(f"oracle must be one of {ORACLE_MODES}")
+    if oracle == "compact":
+        return build_compact_grover_circuit(problem, iterations, measure)
     if synthesis == "auto":
         synthesis = choose_synthesis(problem)
     if synthesis not in SYNTHESIS_MODES[1:]:
         raise ValueError(f"synthesis must be one of {SYNTHESIS_MODES}")
-    if oracle not in ORACLE_MODES:
-        raise ValueError(f"oracle must be one of {ORACLE_MODES}")
     if iterations is None:
         iterations = optimal_iterations(problem.num_candidates, 1)
     if not 0 <= iterations <= 6:

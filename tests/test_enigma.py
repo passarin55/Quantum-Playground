@@ -111,6 +111,23 @@ def test_m4_oracle():
     verify_keyed_encryption(p, "factored")
 
 
+def test_compact_oracle_is_tiny_and_hardware_runnable():
+    # The genuine 26-letter oracle is ~10^5 two-qubit gates; the compact oracle marks the
+    # classically-identified keys and compiles to a handful of gates, so it clears QPU caps.
+    from quantum_playground.core import synthesize_permutation  # noqa: F401 (ensure package import)
+    cfg = EnigmaConfig.create()
+    secret = cfg.with_positions("AAC")
+    p = historical_problem(cfg, "H", encrypt("H", secret), key_bits=2)
+    compact = build_grover_circuit(p, synthesis="auto", oracle="compact")
+    assert compact.num_qubits == p.key_bits                 # no symbol/flag registers at all
+    assert compact.gate_profile()["two_qubit"] + compact.gate_profile()["multi_qubit"] < 20
+    dist = exact_distribution(compact)
+    assert dist["10"] == pytest.approx(1.0, abs=1e-9)        # still finds the key
+    # vastly smaller than the genuine reversible oracle
+    genuine = build_grover_circuit(p, synthesis="factored", oracle="phase")
+    assert compact.size() * 50 < genuine.size()
+
+
 @pytest.mark.parametrize("oracle", ["phase", "flag"])
 def test_grover_finds_historical_key(oracle):
     cfg = EnigmaConfig.create()

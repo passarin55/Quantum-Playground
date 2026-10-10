@@ -31,6 +31,8 @@ class EnigmaGrover(Experiment):
         what_to_look_for="The most frequent measured key should decode to the real setting, and the report decrypts the "
                          "whole message with it. P(crib-consistent key) vs random tells you how well amplification worked.",
         try_this=["Run model=mini on ibm:fake_fez — small enough to see real amplification on a device model.",
+                  "Set oracle=compact to get a hardware-runnable circuit (a few gates) that marks the keys found "
+                  "classically — the only way to run the 26-letter search on a real QPU, with no quantum speedup.",
                   "Increase crib_length to 2 to disambiguate when several 1-letter keys match.",
                   "Use 'Compare oracle synthesis' (web) or inspect the circuit to see staged vs factored vs compiled cost."],
         real_world_use="Demonstrates concretely why symmetric cryptography worried about Grover (quadratic key-search "
@@ -65,7 +67,8 @@ class EnigmaGrover(Experiment):
               Param("first", "str", "A", "First candidate letter of the unknown rotor window"),
               Param("vary", "choice", "right", "Which rotor window is unknown", choices=["right", "middle", "left"]),
               Param("synthesis", "choice", "auto", "Oracle synthesis", choices=["auto", "compiled", "staged", "factored"]),
-              Param("oracle", "choice", "phase", "Oracle style", choices=["phase", "flag"]),
+              Param("oracle", "choice", "phase", "Oracle style (compact = hardware-runnable, classical crib check)",
+                    choices=["phase", "flag", "compact"]),
               Param("iterations", "int", -1, "Grover iterations (-1 = optimal for one solution)", -1, 6)]
 
     def build(self, p):
@@ -94,7 +97,7 @@ class EnigmaGrover(Experiment):
         qc = build_grover_circuit(prob, iterations=it, synthesis=p["synthesis"], oracle=p["oracle"])
         context.update({"labels": prob.candidate_labels, "crib": prob.plaintext, "crib_cipher": prob.ciphertext,
                         "classical_matches": prob.classical_matches(), "iterations": qc.metadata["iterations"],
-                        "synthesis": qc.metadata["synthesis"], "key_bits": prob.key_bits})
+                        "synthesis": qc.metadata["synthesis"], "oracle": p["oracle"], "key_bits": prob.key_bits})
         return Plan([qc], context)
 
     def analyze(self, p, ctx, results):
@@ -114,22 +117,34 @@ class EnigmaGrover(Experiment):
         rows = [[format(k, f"0{b}b"), labels[k], round(key_counts.get(format(k, f"0{b}b"), 0) / res.shots, 4),
                  k in matches] for k in range(1 << b)]
         recovered = labels[idx] == ctx["secret"]
+        oracle = ctx.get("oracle", "phase")
+        if oracle == "compact":
+            how = ("oracle 'compact' (crib check done classically, matching keys marked with phase gates — "
+                   "hardware-runnable, no quantum encryption)")
+        else:
+            how = f"oracle '{oracle}', synthesis '{ctx['synthesis']}'"
+        notes = []
+        if oracle == "compact":
+            notes.append("Compact mode runs on real hardware (a few gates) but does NOT encrypt on quantum data: "
+                         "the key search is classical and Grover only amplifies the already-identified key. It "
+                         "demonstrates amplitude amplification on a QPU, with no cryptanalytic speedup. For the "
+                         "genuine reversible-encryption oracle use oracle=phase/flag (simulator only for 26 letters).")
+        elif len(matches) > 1:
+            notes.append("Several candidates are crib-consistent for a 1-letter crib; increase crib_length to "
+                         "disambiguate (the oracle then marks only simultaneous matches).")
         return Report(
             "Enigma Grover key search",
             [f"Ciphertext: {groups(ctx['ciphertext'])}",
-             f"Crib {ctx['crib']} → {ctx['crib_cipher']}; oracle synthesis '{ctx['synthesis']}', "
-             f"{ctx['iterations']} Grover iteration(s)",
+             f"Crib {ctx['crib']} → {ctx['crib_cipher']}; {how}, {ctx['iterations']} Grover iteration(s)",
              f"Most frequent key {best} → window {labels[idx]} (secret {ctx['secret']})",
              f"Decryption with recovered key: {groups(decrypted)}",
              f"P(crib-consistent key) = {p_match:.4f} (ideal {ideal:.4f}, random {len(matches) / (1 << b):.4f})"],
             {"recovered": recovered, "p_match": p_match, "ideal": ideal, "candidates": 1 << b,
-             "crib_consistent_keys": len(matches)},
+             "crib_consistent_keys": len(matches), "oracle": oracle},
             [Table("Candidates", ["key", "window", "freq", "crib-consistent"], rows)],
             [counts_chart("Key register", key_counts, ideal={format(m, f"0{b}b"): ideal / max(1, len(matches))
                                                                for m in matches})],
-            "pass" if recovered else "warn",
-            notes=["Several candidates can be crib-consistent for a 1-letter crib; increase crib_length to "
-                   "disambiguate (the oracle then marks only simultaneous matches)."] if len(matches) > 1 else [])
+            "pass" if recovered else "warn", notes=notes)
 
 
 @register

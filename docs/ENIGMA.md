@@ -38,6 +38,29 @@ uncompute. The legacy flag oracle (compute/compare/uncompute into flag qubits) i
 | `compiled` | whole keypress permutation per candidate | everything (base + controlled corrections) |
 | `auto` | smallest decomposition-aware cost (NCV model) | |
 
+### Oracle modes
+
+| oracle | what it does | runs on hardware? |
+|---|---|---|
+| `phase` | v8 direct-phase: encrypt all crib letters on quantum data, one collective phase, uncompute | mini only |
+| `flag` | compute/compare/uncompute into per-letter flag qubits (v6/v7 style) | mini only |
+| `compact` | **classical crib check, phase-mark the matching keys** — a handful of gates | **yes, any backend** |
+
+The genuine reversible oracle (`phase`/`flag`) encrypts in superposition and is the honest "no lookup table"
+construction — but for 26 letters it compiles to ~10⁵ native two-qubit gates, far beyond any real QPU (the preflight
+blocks it). The `compact` oracle is the only way to run the 26-letter search on real hardware: it does the crib check
+classically and uses Grover purely to *amplify* the keys already found, so it is tiny (≈2 two-qubit gates for a
+2-qubit key) and clearly provides **no quantum speedup** over the classical scan. It exists to demonstrate amplitude
+amplification itself on a QPU.
+
+```bash
+# The 26-letter genuine oracle is blocked on hardware (honest resource wall):
+qplay run enigma_grover -p secret_window=AAC -b ibm:ibm_marrakesh --dry-run         # BLOCKED: ~10^5 native 2q gates
+# The compact oracle runs the same key search on hardware (no speedup claimed):
+qplay run enigma_grover -p secret_window=AAC -p oracle=compact -b ibm:ibm_marrakesh --dry-run   # OK: ~2 native 2q gates
+qplay run enigma_grover -p secret_window=AAC -p oracle=compact -b ibm:ibm_marrakesh --yes
+```
+
 All strategies act on **all 32 basis states** of the symbol register (codes 26–31 are fixed points), never on a
 table of crib answers, and `verify_keyed_encryption` checks every key × every input exhaustively.
 
