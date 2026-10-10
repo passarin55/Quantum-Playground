@@ -6,7 +6,7 @@ import json
 from ..core.circuit import Circuit
 from ..core.results import hellinger_fidelity
 from ..core.statevector import MAX_QUBITS, exact_distribution
-from .base import Experiment, Param, Plan, Report, Table, counts_chart, register
+from .base import Experiment, Param, Plan, Report, Table, Tutor, counts_chart, register
 
 
 def circuit_from_text(text: str) -> Circuit:
@@ -28,6 +28,27 @@ def circuit_from_text(text: str) -> Circuit:
 @register
 class CustomCircuit(Experiment):
     id = "custom"
+    tutor = Tutor(
+        concept="Your own circuit, run through the same pipeline as every built-in experiment. Build it in the web "
+                "composer or hand it OpenQASM, and the studio simulates, runs and scores it against the ideal.",
+        how_it_works="The circuit (as qplay JSON or OpenQASM 2/3) is simulated exactly, run on your chosen backend, and "
+                     "compared to the noise-free distribution via Hellinger fidelity. If you didn't add measurements, "
+                     "the studio measures everything at the end.",
+        intuition="This is the sandbox: the concepts from the other experiments are yours to combine. The live amplitude "
+                  "and Bloch views in the Circuit Lab let you watch a state evolve gate by gate.",
+        misconception="Fidelity with the ideal needs a simulable reference, so very large circuits skip that check. On "
+                      "hardware, low fidelity usually means depth/noise, not a wrong circuit.",
+        what_to_look_for="Hellinger fidelity near 1 on a good run; the outcome table compares measured counts to ideal "
+                         "probabilities.",
+        try_this=["Build a Bell or GHZ state in the composer and run it on ibm:fake_fez.",
+                  "Paste an OpenQASM 3 circuit exported from Qiskit and run it unchanged.",
+                  "Add mid-circuit measurements and feed-forward to explore dynamic circuits."],
+        real_world_use="This is how you prototype a real algorithm: design on the exact simulator, rehearse on a device "
+                       "model, then submit to hardware — the standard quantum development loop.",
+        going_deeper="Every built-in experiment's 'Preview circuits' shows a circuit you can rebuild and modify here.",
+        references=[{"title": "OpenQASM", "url": "https://openqasm.com/"}],
+        prerequisites=["bell_states"],
+    )
     title = "Custom circuit"
     category = "Circuit Lab"
     summary = "Execute a circuit from the composer (JSON) or OpenQASM on any backend, compared with the ideal."

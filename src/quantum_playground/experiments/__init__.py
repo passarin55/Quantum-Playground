@@ -1,9 +1,10 @@
 """Experiment library: 21 self-analysing experiments plus the custom-circuit runner."""
-from .base import REGISTRY, Chart, Experiment, Param, Plan, Report, Table, get_experiment, register
+from .base import REGISTRY, Chart, Experiment, Param, Plan, Report, Table, Tutor, get_experiment, register
 
 
 def _load_all():
-    from . import (custom, entanglement, enigma_lab, fourier, hardware, oracles, protocols,  # noqa: F401
+    from . import (applications, custom, dynamics, entanglement, enigma_lab, fourier, hardware,  # noqa: F401
+                   oracles, optimization, protocols, qec, security,
                    variational)
 
 

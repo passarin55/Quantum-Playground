@@ -40,6 +40,26 @@ def experiments(_body):
     return 200, {"experiments": list_experiments()}
 
 
+def tutor_index(_body):
+    from ..tutor import GLOSSARY, curriculum_dict
+    return 200, {"curriculum": curriculum_dict(), "glossary": GLOSSARY}
+
+
+def tutor_lesson(_body, lesson_id):
+    from ..tutor import lesson_by_id
+    lsn = lesson_by_id(lesson_id)
+    if lsn is None:
+        return 404, {"error": f"unknown lesson {lesson_id!r}"}
+    return 200, lsn.to_dict()
+
+
+def experiment_tutor(_body, exp_id):
+    exp = get_experiment(exp_id)
+    if not (exp.tutor and exp.tutor.concept):
+        return 404, {"error": f"no tutor for {exp_id}"}
+    return 200, {"id": exp.id, "title": exp.title, "tutor": exp.tutor.to_dict()}
+
+
 def experiment_circuits(body, exp_id):
     exp = get_experiment(exp_id)
     plan = exp.build(exp.resolve(body.get("params")))
@@ -216,6 +236,9 @@ def ibm_devices(_body):
 ROUTES = [
     ("GET", "/api/info", info),
     ("GET", "/api/experiments", experiments),
+    ("GET", "/api/tutor", tutor_index),
+    ("GET", "/api/tutor/lesson/{id}", tutor_lesson),
+    ("GET", "/api/experiments/{id}/tutor", experiment_tutor),
     ("POST", "/api/experiments/{id}/circuits", experiment_circuits),
     ("POST", "/api/run", run),
     ("POST", "/api/preflight", preflight),

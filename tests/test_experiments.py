@@ -9,7 +9,10 @@ from quantum_playground.experiments.library import continued_fraction_candidates
 from quantum_playground.experiments.variational import h2_exact
 from quantum_playground.runner import Runner
 
-EXPECT_WARN_ON_IDEAL = {"coherence"}   # an ideal simulator has no decoherence to measure
+# Experiments whose correct verdict on an ideal simulator is "warn":
+#  coherence       — an ideal simulator has no decoherence to measure
+#  qday_estimator  — flags harvest-now-decrypt-later risk for the default data lifetime
+EXPECT_WARN_ON_IDEAL = {"coherence", "qday_estimator"}
 
 
 def test_registry_complete():

@@ -168,6 +168,54 @@ def _chart_text(c: Chart, width: int = 40, max_rows: int = 32) -> list[str]:
     return lines
 
 
+@dataclass
+class Tutor:
+    """A self-contained mini-lesson attached to an experiment.
+
+    Every field is plain prose aimed at a curious beginner; the goal is that a
+    learner can read the tutor, run the experiment, and understand what they are
+    looking at and why it matters in the real world.
+    """
+
+    concept: str = ""                 # the one big idea, in a sentence or two
+    how_it_works: str = ""            # what the circuit does, step by step
+    intuition: str = ""              # the mental model that makes it click
+    misconception: str = ""          # the wrong idea to unlearn
+    what_to_look_for: str = ""       # how to read the report / what "success" looks like
+    try_this: list[str] = field(default_factory=list)   # concrete parameter experiments
+    real_world_use: str = ""         # where this matters outside the playground
+    going_deeper: str = ""           # the next concept / where to read more
+    references: list[dict] = field(default_factory=list)  # [{title, url}]
+    prerequisites: list[str] = field(default_factory=list)  # lesson/experiment ids
+
+    def to_dict(self) -> dict:
+        return {"concept": self.concept, "how_it_works": self.how_it_works, "intuition": self.intuition,
+                "misconception": self.misconception, "what_to_look_for": self.what_to_look_for,
+                "try_this": list(self.try_this), "real_world_use": self.real_world_use,
+                "going_deeper": self.going_deeper, "references": list(self.references),
+                "prerequisites": list(self.prerequisites)}
+
+    def to_text(self, title: str = "") -> str:
+        out = [f"=== Tutor: {title} ===" if title else "=== Tutor ==="]
+        pairs = [("The idea", self.concept), ("How it works", self.how_it_works),
+                 ("Intuition", self.intuition), ("Common misconception", self.misconception),
+                 ("What to look for", self.what_to_look_for), ("Why it matters", self.real_world_use),
+                 ("Going deeper", self.going_deeper)]
+        for label, body in pairs:
+            if body:
+                out += ["", label + ":", _wrap(body)]
+        if self.try_this:
+            out += ["", "Try this:"] + [f"  • {t}" for t in self.try_this]
+        if self.references:
+            out += ["", "References:"] + [f"  - {r.get('title', '')}: {r.get('url', '')}" for r in self.references]
+        return "\n".join(out)
+
+
+def _wrap(text: str, width: int = 96) -> str:
+    import textwrap
+    return "\n".join(textwrap.fill(p, width) for p in text.split("\n"))
+
+
 class Experiment:
     id: str = ""
     title: str = ""
@@ -177,6 +225,7 @@ class Experiment:
     params: list[Param] = []
     hardware_notes: str = ""
     default_shots: int = 2000
+    tutor: Tutor = Tutor()
 
     def resolve(self, raw: Optional[dict] = None) -> dict:
         raw = dict(raw or {})
@@ -192,10 +241,14 @@ class Experiment:
     def analyze(self, params: dict, context: dict, results: list[CircuitResult]) -> Report:
         raise NotImplementedError
 
-    def describe(self) -> dict:
-        return {"id": self.id, "title": self.title, "category": self.category, "summary": self.summary,
-                "description": self.description, "hardware_notes": self.hardware_notes,
-                "default_shots": self.default_shots, "params": [p.to_dict() for p in self.params]}
+    def describe(self, include_tutor: bool = False) -> dict:
+        d = {"id": self.id, "title": self.title, "category": self.category, "summary": self.summary,
+             "description": self.description, "hardware_notes": self.hardware_notes,
+             "default_shots": self.default_shots, "params": [p.to_dict() for p in self.params],
+             "has_tutor": bool(self.tutor and self.tutor.concept)}
+        if include_tutor:
+            d["tutor"] = self.tutor.to_dict() if self.tutor else None
+        return d
 
 
 REGISTRY: dict[str, Experiment] = {}

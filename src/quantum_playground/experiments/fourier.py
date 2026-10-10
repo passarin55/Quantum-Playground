@@ -8,13 +8,36 @@ import numpy as np
 
 from ..core.circuit import Circuit
 from ..core.synthesis import apply_permutation
-from .base import Chart, Experiment, Param, Plan, Report, Table, counts_chart, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, counts_chart, register
 from .library import continued_fraction_candidates, fourier_state, multiplicative_order, qft
 
 
 @register
 class QFTExperiment(Experiment):
     id = "qft"
+    tutor = Tutor(
+        concept="The Quantum Fourier Transform is the quantum version of the discrete Fourier transform — the tool that "
+                "finds periods and frequencies. It's the mathematical heart of Shor's algorithm and phase estimation.",
+        how_it_works="On n qubits the QFT is just n Hadamards interleaved with controlled-phase rotations (and a bit "
+                     "reversal) — only O(n²) gates for a transform over 2ⁿ amplitudes, where the classical FFT needs "
+                     "O(n·2ⁿ). This demo either encodes an integer in Fourier phases and reads it back with the inverse "
+                     "QFT, or reveals the period of a prepared periodic state.",
+        intuition="The QFT moves information from the AMPLITUDES into the PHASES and back. A periodic pattern in the "
+                  "computational basis becomes sharp peaks after the QFT — exactly how it exposes hidden periods.",
+        misconception="The exponential 'speed' of the QFT is NOT directly usable: you can't read all 2ⁿ Fourier "
+                      "amplitudes, only sample one outcome. It's valuable only inside algorithms (Shor, QPE) that arrange "
+                      "for the useful frequency to dominate the measurement.",
+        what_to_look_for="In round-trip mode you recover the exact input integer. In periodic mode you see peaks at "
+                         "multiples of 2ⁿ/r. The report compares measured mass on the ideal outcomes.",
+        try_this=["Switch mode to periodic with a period that's a power of two and watch the peaks appear.",
+                  "Change the encoded integer and confirm the inverse QFT reads it back.",
+                  "Run on a noisy backend to see the peaks blur."],
+        real_world_use="The QFT powers Shor's factoring (period finding), quantum phase estimation (used in chemistry "
+                       "and metrology), and quantum signal processing.",
+        going_deeper="Phase estimation uses the inverse QFT to read an eigenphase; Shor uses it to read a period.",
+        references=[{"title": "Quantum Fourier transform", "url": "https://en.wikipedia.org/wiki/Quantum_Fourier_transform"}],
+        prerequisites=["bell_states"],
+    )
     title = "Quantum Fourier transform: round trip and period finding"
     category = "Fourier"
     summary = "Encode an integer in Fourier phases and read it back with QFT†, or reveal a period with the QFT."
@@ -60,6 +83,28 @@ class QFTExperiment(Experiment):
 @register
 class PhaseEstimation(Experiment):
     id = "qpe"
+    tutor = Tutor(
+        concept="Quantum phase estimation measures the eigenphase of a quantum operation — the single most-used "
+                "subroutine in quantum computing. If a unitary U has U|ψ⟩ = e^{2πiφ}|ψ⟩, QPE reads out φ.",
+        how_it_works="A register of t 'counting' qubits controls successively doubled powers of U acting on an "
+                     "eigenstate. This writes the phase φ into the counting register as a binary fraction via kickback; "
+                     "the inverse QFT then decodes it. More counting qubits → more bits of precision (2^−t).",
+        intuition="Each counting qubit asks 'what's the next binary digit of the phase?'. Controlled-U^(2^k) rotates "
+                  "the k-th qubit by the right amount, and the inverse QFT collects those rotations into a number.",
+        misconception="QPE gives a finite-precision estimate, not the exact phase, and if φ isn't an exact t-bit "
+                      "fraction you get the nearest value most of the time plus a spread — that's expected, not an error.",
+        what_to_look_for="The most frequent reading, divided by 2^t, approximates φ. The report shows the estimate, the "
+                         "error, and P(within one bin) — which is ≥ 0.81 for any φ with enough counting qubits.",
+        try_this=["Set φ to an exact fraction like 0.25 (t=2) for a clean single peak.",
+                  "Set φ to something like 0.3 and watch the distribution spread around the nearest bins.",
+                  "Add counting qubits (t) to sharpen the estimate."],
+        real_world_use="QPE estimates molecular ground-state energies (quantum chemistry), powers the fault-tolerant "
+                       "version of Shor's algorithm, and enables Heisenberg-limited quantum sensing.",
+        going_deeper="Shor's algorithm is phase estimation applied to a modular-multiplication operator; VQE is the "
+                     "NISQ-friendly alternative when full QPE is too deep.",
+        references=[{"title": "Quantum phase estimation", "url": "https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm"}],
+        prerequisites=["qft"],
+    )
     title = "Quantum phase estimation of P(2πφ)"
     category = "Fourier"
     summary = "Estimate the eigenphase φ of a phase gate with t counting qubits (precision 2^-t)."
@@ -99,6 +144,31 @@ class PhaseEstimation(Experiment):
 @register
 class Shor(Experiment):
     id = "shor"
+    tutor = Tutor(
+        concept="Shor's algorithm factors large numbers exponentially faster than any known classical method. It is the "
+                "reason RSA and elliptic-curve cryptography — which secure most of the internet — will eventually break.",
+        how_it_works="Factoring N reduces to finding the PERIOD r of f(x) = aˣ mod N for a random a. The quantum part "
+                     "does this: controlled modular-multiplication circuits build aˣ mod N in superposition, and the "
+                     "inverse QFT reads out the period. A classical continued-fractions step turns the measured phase "
+                     "into r, and then gcd(a^(r/2)±1, N) usually yields a factor.",
+        intuition="Only the PERIOD is quantum-hard. The circuit builds a genuine modular multiplier (not a shortcut that "
+                  "assumes the answer), the QFT exposes its repeat length, and number theory finishes the job classically.",
+        misconception="Today's hardware can't factor anything of cryptographic size — honest demonstrations factor 15 or "
+                      "21, and even those need hundreds of noisy two-qubit gates. RSA-2048 would need millions of "
+                      "error-corrected qubits. The THREAT is real and future; the current CAPABILITY is tiny.",
+        what_to_look_for="Peaks in the counting register at multiples of 2^t/r. The report lists measured phases, the "
+                         "recovered order, and the factors found (e.g. 15 = 3×5).",
+        try_this=["Factor N=15 with a=7, then N=21 with a=2 (give it t=8 counting qubits).",
+                  "Pick an `a` that shares a factor with N and watch the classical shortcut trigger.",
+                  "Run on ibm:fake_fez and compare the success fraction — the modular multipliers are deep."],
+        real_world_use="Shor is why NIST standardised post-quantum cryptography (ML-KEM, ML-DSA) and why 'harvest "
+                       "now, decrypt later' is a present-day concern for long-lived secrets.",
+        going_deeper="See the RSA/ECC resource-estimate view in the security experiments for how many qubits a real "
+                     "break would take, and the post-quantum KEM demo for what replaces RSA.",
+        references=[{"title": "Shor's algorithm", "url": "https://en.wikipedia.org/wiki/Shor%27s_algorithm"},
+                    {"title": "NIST Post-Quantum Cryptography", "url": "https://csrc.nist.gov/projects/post-quantum-cryptography"}],
+        prerequisites=["qpe"],
+    )
     title = "Shor's algorithm: order finding and factoring"
     category = "Fourier"
     summary = "Quantum order finding of a mod N with exact reversible modular multipliers, then classical factoring."

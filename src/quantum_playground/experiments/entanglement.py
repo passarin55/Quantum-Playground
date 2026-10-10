@@ -7,7 +7,7 @@ import numpy as np
 
 from ..core.circuit import Circuit
 from ..core.statevector import Statevector
-from .base import Chart, Experiment, Param, Plan, Report, Table, binomial_sigma, counts_chart, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, binomial_sigma, counts_chart, register
 
 _BELL = {"phi+": ("Φ+", False, False), "phi-": ("Φ−", True, False), "psi+": ("Ψ+", False, True),
          "psi-": ("Ψ−", True, True)}
@@ -34,6 +34,29 @@ def _basis_change(qc: Circuit, q: int, basis: str) -> None:
 @register
 class BellStates(Experiment):
     id = "bell_states"
+    tutor = Tutor(
+        concept="A Bell state is the simplest entangled state: two qubits that have no definite value on their own, "
+                "yet whose measurements are perfectly correlated. Measuring one instantly fixes the other.",
+        how_it_works="H on qubit 0 makes |0⟩+|1⟩; a CNOT copies that into qubit 1, giving (|00⟩+|11⟩)/√2. We can't "
+                     "read the whole state on hardware, so we estimate three correlators ⟨XX⟩, ⟨YY⟩, ⟨ZZ⟩ by rotating "
+                     "into each basis before measuring. Fidelity = (1 + s_x⟨XX⟩ + s_y⟨YY⟩ + s_z⟨ZZ⟩)/4.",
+        intuition="Entanglement is a property of the PAIR, not the parts. Each qubit alone looks like a coin flip "
+                  "(its Bloch vector is zero), but together they share a correlation that no classical coins can.",
+        misconception="Nothing travels faster than light. You can't send a message this way — each side sees pure "
+                      "randomness until they compare notes over a normal (slower-than-light) channel.",
+        what_to_look_for="Fidelity above 0.5 certifies genuine entanglement. On a perfect simulator F=1; on hardware "
+                         "each CNOT and readout error chips away at it, so a real Bell test lands around 0.95–0.99.",
+        try_this=["Switch the `state` to psi- and watch ⟨ZZ⟩ flip sign (anti-correlated outcomes).",
+                  "Run on local-noisy:noisy and on ibm:fake_fez to see fidelity drop with real error rates.",
+                  "Add --mitigate-readout on a noisy backend and watch the fidelity recover."],
+        real_world_use="Entanglement is the fuel for teleportation, superdense coding, quantum key distribution and "
+                       "every quantum speedup. Bell-pair fidelity is the standard 'is my two-qubit gate any good?' benchmark.",
+        going_deeper="The CHSH experiment turns these correlations into a test that rules out any classical "
+                     "explanation; GHZ extends entanglement to many qubits.",
+        references=[{"title": "Qiskit: Entanglement in Action", "url": "https://quantum.cloud.ibm.com/learning"},
+                    {"title": "Nielsen & Chuang, §1.3.6 (EPR / Bell)", "url": "https://en.wikipedia.org/wiki/Bell_state"}],
+        prerequisites=[],
+    )
     title = "Bell-state fidelity (XX / YY / ZZ correlations)"
     category = "Entanglement"
     summary = "Prepare a Bell state and estimate its fidelity from three Pauli correlators."
@@ -84,6 +107,28 @@ class BellStates(Experiment):
 @register
 class CHSH(Experiment):
     id = "chsh"
+    tutor = Tutor(
+        concept="The CHSH test is an experiment whose result a classical universe literally cannot produce. It settles "
+                "the Einstein–Bohr debate with numbers: quantum correlations are stronger than any 'hidden variable' theory allows.",
+        how_it_works="Share a Bell pair. Alice measures along one of two angles, Bob along one of two others. For each "
+                     "of the four combinations we estimate the correlation E(a,b), then form S = E(00)+E(01)+E(10)−E(11).",
+        intuition="Any theory where each particle secretly 'already decided' its answers obeys |S| ≤ 2. Quantum "
+                  "mechanics reaches S = 2√2 ≈ 2.83 (Tsirelson's bound) because the two measurement choices share one "
+                  "entangled state, not two pre-set answer sheets.",
+        misconception="This is not just noise or a loophole. Loophole-free CHSH experiments (2015) closed the detection "
+                      "and locality gaps — the violation is real physics, and it won the 2022 Nobel Prize.",
+        what_to_look_for="S > 2 is the headline. The report gives S with error bars and a violation significance in σ. "
+                         "Even noisy hardware usually clears 2 by many σ; the ideal value is 2.83.",
+        try_this=["Set bob_offset_deg=45 and watch S fall to the classical value of 2 — the magic angles matter.",
+                  "Run on ibm:fake_fez: real devices typically reach S ≈ 2.6–2.75, still a clear violation.",
+                  "Compare the measured correlators to the ideal cos(a−b) curve in the report table."],
+        real_world_use="A CHSH violation is the security certificate behind device-independent cryptography and "
+                       "certified quantum randomness: if S > 2, no eavesdropper could have pre-programmed the outcomes.",
+        going_deeper="The Mermin–GHZ game sharpens this from a statistical inequality to a single all-or-nothing round.",
+        references=[{"title": "Nobel Prize in Physics 2022", "url": "https://www.nobelprize.org/prizes/physics/2022/"},
+                    {"title": "CHSH inequality", "url": "https://en.wikipedia.org/wiki/CHSH_inequality"}],
+        prerequisites=["bell_states"],
+    )
     title = "CHSH Bell-inequality test"
     category = "Entanglement"
     summary = "Violate the CHSH inequality |S| ≤ 2 obeyed by every local-hidden-variable theory."
@@ -144,6 +189,28 @@ class CHSH(Experiment):
 @register
 class GHZ(Experiment):
     id = "ghz"
+    tutor = Tutor(
+        concept="A GHZ state is a 'Schrödinger's cat' for n qubits: all of them |0⟩ or all of them |1⟩ at once, "
+                "(|00…0⟩ + |11…1⟩)/√2. It is the most fragile, most entangled state of its size.",
+        how_it_works="H on the first qubit, then a ladder (or tree) of CNOTs spreads that superposition to all n qubits. "
+                     "To prove it's truly coherent — not just a classical mix of all-0 and all-1 — we rotate every qubit "
+                     "by a phase φ and measure parity, which oscillates as cos(nφ). The faster wiggle (n×) is the fingerprint.",
+        intuition="Measuring populations (how often you see 000… or 111…) is necessary but not sufficient: a boring "
+                  "classical coin that's either all-heads or all-tails gives the same histogram. The PARITY oscillation "
+                  "is what proves the two branches are genuinely superposed.",
+        misconception="Seeing only 000 and 111 in the counts doesn't prove entanglement. You must also see the parity "
+                      "fringes; fidelity combines both.",
+        what_to_look_for="Fidelity F = (P₀+P₁)/2 + C/2 where C is the parity contrast. F > 0.5 certifies genuine "
+                         "multipartite entanglement. Fidelity falls fast with n on real hardware — that fragility is the lesson.",
+        try_this=["Increase n and watch fidelity drop on ibm:fake_fez — GHZ states are a brutal hardware stress test.",
+                  "Switch layout from chain to tree to cut circuit depth (log n instead of n) and compare.",
+                  "Compare the measured parity curve to the ideal cos(nφ) — n full wiggles across the scan."],
+        real_world_use="GHZ states power quantum-enhanced sensing (Heisenberg-limited metrology), multi-party secret "
+                       "sharing, and are the workhorse benchmark for how many qubits a device can genuinely entangle.",
+        going_deeper="GHZ-enhanced phase estimation beats the standard quantum limit — see the metrology experiments.",
+        references=[{"title": "Greenberger–Horne–Zeilinger state", "url": "https://en.wikipedia.org/wiki/GHZ_state"}],
+        prerequisites=["bell_states"],
+    )
     title = "GHZ state: populations + parity oscillations"
     category = "Entanglement"
     summary = "Create an n-qubit GHZ state and estimate its fidelity from parity oscillations."

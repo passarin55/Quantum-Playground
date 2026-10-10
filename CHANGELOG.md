@@ -1,5 +1,36 @@
 # Changelog
 
+## 9.1.0 — tutor + practical experiments
+
+Adds a learning layer and eleven new real-world experiments, informed by a deep web survey of practical quantum
+computing applications.
+
+### Added
+- **Tutor**: a 14-lesson curriculum (foundations → algorithms → applications → hardware) and a 30+ term glossary
+  (`quantum_playground/tutor.py`), each lesson tied to a runnable experiment; plus an in-depth `Tutor` attached to
+  every one of the 32 experiments (idea, how it works, intuition, misconception, what to look for, try-this,
+  real-world use, references).
+- CLI: `qplay learn` (curriculum / lessons / glossary / `exp:<id>` / `term:<word>`) and `qplay describe <id> --tutor`.
+- Web studio: a **Tutor** tab (curriculum, lesson view, filterable glossary) and a **📘 Learn** panel on every
+  experiment; API endpoints `/api/tutor`, `/api/tutor/lesson/{id}`, `/api/experiments/{id}/tutor`.
+- **Security (defensive, synthetic)**: `grover_key_search` — a toy known-plaintext attack that recovers a key with
+  Grover's √ speedup and extrapolates the quantum cost of real symmetric key lengths; `qday_estimator` — factors 15
+  with Shor and estimates RSA/ECC break cost plus a harvest-now-decrypt-later risk check.
+- **Optimization**: `qaoa_portfolio` (mean-variance finance), `qaoa_mis` (maximum independent set).
+- **Chemistry / ML**: `vqe_ising` (transverse-field Ising magnet ground state + phase transition),
+  `qkernel` (quantum-kernel classifier vs classical kernels).
+- **Simulation / Metrology**: `tfim_dynamics` (Trotterized spin dynamics), `quantum_walk` (ballistic spreading),
+  `ghz_metrology` (Heisenberg-limit sensing).
+- **Protocols**: `e91_qkd` (Ekert entanglement QKD with a CHSH security certificate).
+- **Error correction**: `shor_code` — the nine-qubit code, verified to correct every single-qubit X/Y/Z error with
+  live stabilizer measurement and feed-forward correction.
+- Tests grew from 116 to 157 (new experiments, the tutor/curriculum/glossary, CLI `learn`, web tutor endpoints).
+
+### Notes
+- All security experiments are toy-scale, synthetic and purely educational; they cannot attack any real system.
+- The research sweep ran as a background workflow of parallel web-survey agents; two sweeps and the synthesis step
+  hit a session usage limit, so the curriculum and a few lessons were authored from standard pedagogy instead.
+
 ## 9.0.0 — complete redesign
 
 Rebuilt from *Quantum Playground Studio v8 — Direct-Phase Enigma* (Windows/PySide6) as a cross-platform package.

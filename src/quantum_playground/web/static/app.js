@@ -55,6 +55,7 @@ function showTab(name) {
   $$(".tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + name));
   if (name === "jobs") loadJobs();
   if (name === "settings") loadIbmStatus();
+  if (name === "tutor") loadTutor();
   try { history.replaceState(null, "", "#" + name); } catch (_) {}
 }
 
@@ -377,7 +378,8 @@ function selectExperiment(id) {
   if (!e) return;
   state.currentExp = e;
   $$("#expList button").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
-  $("#expDetail").innerHTML = `<h2>${esc(e.title)}</h2><p>${esc(e.summary)}</p>${e.description ? `<p class="muted small">${esc(e.description)}</p>` : ""}
+  $("#expDetail").innerHTML = `<h2>${esc(e.title)} ${e.has_tutor ? '<span class="badge pass" style="text-transform:none">📘 tutor</span>' : ""}</h2>
+    <p>${esc(e.summary)}</p>${e.description ? `<p class="muted small">${esc(e.description)}</p>` : ""}
     ${e.hardware_notes ? `<p class="small"><b>Hardware:</b> ${esc(e.hardware_notes)}</p>` : ""}
     <div class="form-grid">${e.params.map(paramInput).join("")}</div>`;
   $("#expShots").value = e.default_shots;
@@ -491,6 +493,81 @@ function initEnigma() {
   });
 }
 
+/* ------------------------------------------------------------------ tutor */
+const LEVEL_LABEL = { foundations: "Foundations", algorithms: "Algorithms", applications: "Applications", hardware: "Hardware" };
+let tutorData = null;
+
+async function loadTutor() {
+  if (tutorData) return;
+  try {
+    tutorData = await api("GET", "/api/tutor");
+    let level = null, h = "";
+    tutorData.curriculum.forEach((l) => {
+      if (l.level !== level) { level = l.level; h += `<h4>${esc(LEVEL_LABEL[level] || level)}</h4>`; }
+      h += `<button data-lesson="${esc(l.id)}">${esc(l.title)}</button>`;
+    });
+    $("#tutorList").innerHTML = h;
+    $$("#tutorList button").forEach((b) => b.addEventListener("click", () => showLesson(b.dataset.lesson)));
+    renderGlossary("");
+    $("#glossarySearch").addEventListener("input", (e) => renderGlossary(e.target.value));
+    if (tutorData.curriculum[0]) showLesson(tutorData.curriculum[0].id);
+  } catch (e) { toast(e.message); }
+}
+
+function showLesson(id) {
+  const l = tutorData.curriculum.find((x) => x.id === id);
+  if (!l) return;
+  $$("#tutorList button").forEach((b) => b.classList.toggle("active", b.dataset.lesson === id));
+  const field = (label, body) => body ? `<h3>${esc(label)}</h3><p>${esc(body)}</p>` : "";
+  let h = `<h2>${esc(l.title)} <span class="badge pass" style="text-transform:none">${esc(LEVEL_LABEL[l.level] || l.level)}</span></h2>`;
+  h += field("The big idea", l.big_idea);
+  h += field("Key intuition", l.key_intuition);
+  h += field("Common misconception", l.common_misconception);
+  h += field("Why it matters", l.real_world_use);
+  h += `<h3>Try it in the playground</h3><p>${esc(l.try_what_to_look_for)}</p>
+        <button class="primary" data-run="${esc(l.try_experiment)}">Open ${esc(l.try_experiment)} →</button>`;
+  if (l.steps && l.steps.length) h += `<h3>Steps</h3><ol class="steps">${l.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>`;
+  if (l.further_reading && l.further_reading.length)
+    h += `<h3>Further reading</h3><ul>${l.further_reading.map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${esc(r.title)}</a></li>`).join("")}</ul>`;
+  $("#lessonDetail").innerHTML = h;
+  const btn = $("#lessonDetail [data-run]");
+  if (btn) btn.addEventListener("click", () => { showTab("experiments"); selectExperiment(btn.dataset.run); });
+  try { history.replaceState(null, "", "#tutor/" + id); } catch (_) {}
+}
+
+function renderGlossary(filter) {
+  const g = tutorData.glossary;
+  const q = (filter || "").toLowerCase();
+  const keys = Object.keys(g).filter((k) => !q || k.toLowerCase().includes(q) || g[k].toLowerCase().includes(q)).sort();
+  $("#glossary").innerHTML = keys.map((k) => `<div class="gterm"><b>${esc(k)}</b><span>${esc(g[k])}</span></div>`).join("")
+    || '<p class="muted small">No matching terms.</p>';
+}
+
+function tutorPanel(t, title) {
+  const li = (label, body) => body ? `<div class="tsec"><span>${esc(label)}</span><p>${esc(body)}</p></div>` : "";
+  let h = `<div class="card tutorcard"><h2>📘 ${esc(title)} — tutor</h2>`;
+  h += li("The idea", t.concept);
+  h += li("How it works", t.how_it_works);
+  h += li("Intuition", t.intuition);
+  h += li("Common misconception", t.misconception);
+  h += li("What to look for", t.what_to_look_for);
+  h += li("Why it matters", t.real_world_use);
+  h += li("Going deeper", t.going_deeper);
+  if (t.try_this && t.try_this.length)
+    h += `<div class="tsec"><span>Try this</span><ul class="steps">${t.try_this.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>`;
+  if (t.references && t.references.length)
+    h += `<div class="tsec"><span>References</span><ul>${t.references.map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${esc(r.title)}</a></li>`).join("")}</ul></div>`;
+  return h + "</div>";
+}
+
+async function showExperimentTutor() {
+  const e = state.currentExp; if (!e) return;
+  try {
+    const d = await api("GET", `/api/experiments/${encodeURIComponent(e.id)}/tutor`);
+    $("#expOutput").innerHTML = tutorPanel(d.tutor, d.title);
+  } catch (err) { $("#expOutput").innerHTML = `<div class="card"><p class="muted">No tutor for this experiment.</p></div>`; }
+}
+
 /* ------------------------------------------------------------------ jobs */
 async function loadJobs() {
   try {
@@ -545,12 +622,14 @@ function initSettings() {
     initEnigma();
     initSettings();
     await loadExperiments();
+    $("#expLearn").addEventListener("click", showExperimentTutor);
     $("#expPreview").addEventListener("click", () => expAction("preview"));
     $("#expPreflight").addEventListener("click", () => expAction("preflight"));
     $("#expRun").addEventListener("click", () => expAction("run"));
     $("#jobsReload").addEventListener("click", loadJobs);
     const hash = location.hash.replace("#", "");
     if (hash.startsWith("experiments/")) { showTab("experiments"); selectExperiment(hash.split("/")[1]); }
+    else if (hash.startsWith("tutor/")) { showTab("tutor"); await loadTutor(); showLesson(hash.split("/")[1]); }
     else if (hash) showTab(hash);
   } catch (e) {
     document.querySelector("main").insertAdjacentHTML("afterbegin", `<div class="card err">Could not reach the qplay server: ${esc(e.message)}</div>`);

@@ -6,13 +6,39 @@ import math
 import numpy as np
 
 from ..core.circuit import Circuit
-from .base import Chart, Experiment, Param, Plan, Report, Table, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, register
 from .library import fit_damped_cosine, fit_exponential
 
 
 @register
 class RepetitionCode(Experiment):
     id = "repetition_code"
+    tutor = Tutor(
+        concept="Quantum error correction protects fragile quantum information by spreading one 'logical' qubit across "
+                "many physical ones, so errors can be detected and fixed without ever reading (and destroying) the data. "
+                "The repetition code is the simplest example.",
+        how_it_works="Encode one qubit into d copies with CNOTs. Errors are injected, then ANCILLA qubits measure "
+                     "PARITIES between neighbours (syndromes) — these reveal WHERE an error occurred without revealing the "
+                     "encoded value. Majority voting (or syndrome decoding) corrects it. An unencoded qubit runs alongside "
+                     "for comparison.",
+        intuition="You never measure the data directly — that would collapse it. You measure relationships (does qubit 1 "
+                  "agree with qubit 2?), which pinpoint errors while leaving the superposition intact. Below a noise "
+                  "threshold, more qubits = exponentially fewer logical errors.",
+        misconception="The repetition code only catches ONE type of error (bit-flip OR phase-flip, not both), so it's not "
+                      "a full quantum code — real codes like the surface code handle both. It's the on-ramp, not the "
+                      "destination.",
+        what_to_look_for="Logical error rate BELOW the physical rate (that's error suppression working), matching the "
+                         "combinatorial theory. The syndrome histogram shows which error patterns occurred.",
+        try_this=["Increase distance d and watch the logical error rate fall (for p below threshold).",
+                  "Switch flip to 'phase' (with the basis change) to protect against phase errors instead.",
+                  "Push p past ~0.5 and watch correction fail — above threshold, more qubits HURT."],
+        real_world_use="Fault-tolerant quantum computing — the thing that makes Shor-scale algorithms possible — is "
+                       "built from codes like this. The surface code is the leading candidate; 2023–2024 saw the first "
+                       "below-threshold demonstrations.",
+        going_deeper="The Steane [[7,1,3]] and surface codes correct both error types; see the QEC roadmap experiments.",
+        references=[{"title": "Quantum error correction", "url": "https://en.wikipedia.org/wiki/Quantum_error_correction"}],
+        prerequisites=["ghz"],
+    )
     title = "Repetition code: syndrome extraction and majority decoding"
     category = "Error correction"
     summary = "Encode one logical qubit in d physical qubits, inject errors, measure syndromes, decode."
@@ -105,6 +131,29 @@ class RepetitionCode(Experiment):
 @register
 class Coherence(Experiment):
     id = "coherence"
+    tutor = Tutor(
+        concept="Every real qubit forgets. T1 and T2 measure how long it keeps its energy and its phase before noise "
+                "erases the quantum information. These two numbers set the clock on everything a device can compute.",
+        how_it_works="T1 (relaxation): excite the qubit with X, wait a varying time, measure — the chance of still "
+                     "reading 1 decays as e^(−t/T1). T2* (Ramsey): put the qubit on the equator, let it precess with a "
+                     "small detuning, wait, and bring it back — the interference fringes decay as e^(−t/T2*). We fit both curves.",
+        intuition="T1 is energy leaking to the environment (|1⟩→|0⟩). T2 is the phase getting scrambled — the two "
+                  "'hands' of the quantum clock drifting apart. T2 ≤ 2·T1 always, because losing energy also loses phase.",
+        misconception="The ideal `local` simulator has NO decoherence, so the curves are flat and the fit is "
+                      "meaningless there. You must run this on a noise model (local-noisy:*, aer:fake_*) or real hardware "
+                      "to see decay — that's the whole point.",
+        what_to_look_for="A clean exponential decay for T1 and decaying Ramsey fringes for T2*, with fitted times in "
+                         "microseconds. On local the report warns that nothing decayed.",
+        try_this=["Run on local-noisy:heron_like vs local-noisy:noisy and compare the fitted T1/T2.",
+                  "Run on ibm:fake_fez to see a calibrated device's real coherence times.",
+                  "Change the Ramsey detuning and watch the fringe frequency change."],
+        real_world_use="T1/T2 are the headline specs vendors report and improve release to release; they bound circuit "
+                       "depth, gate counts, and ultimately which algorithms a device can run before information decays.",
+        going_deeper="Dynamical decoupling and error mitigation fight T2 decay; error correction fights both — see the "
+                     "repetition code.",
+        references=[{"title": "Relaxation (T1) and dephasing (T2)", "url": "https://en.wikipedia.org/wiki/Relaxation_(NMR)"}],
+        prerequisites=["qrng"],
+    )
     title = "Qubit coherence: T1 relaxation and Ramsey T2*"
     category = "Device physics"
     summary = "Delay sweeps with exponential / damped-cosine fits — run on a noisy simulator or real hardware."

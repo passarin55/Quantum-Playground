@@ -7,11 +7,31 @@ rebuilt as a tested Python package with a CLI, a local web studio and one execut
 | | |
 |---|---|
 | **Engine** | Own circuit IR · vectorised statevector simulator with mid-circuit measurement and feed-forward · density-matrix simulator with T1/T2, depolarizing and readout noise · exhaustive reversible-logic simulator · MMD permutation synthesis · OpenQASM 2/3 export |
-| **Experiments** | 21 self-checking experiments: CHSH, Bell fidelity, GHZ, teleportation (dynamic circuits), superdense coding, BB84/BBM92 QKD with an eavesdropper, QRNG, Deutsch–Jozsa, Bernstein–Vazirani, Simon, Grover, Grover-SAT, QFT, phase estimation, Shor, VQE (H₂), QAOA MaxCut, repetition code, T1/Ramsey coherence, Enigma Grover key search, quantum-random Enigma key sheet |
+| **Experiments** | **32 self-checking experiments** across security, optimization, chemistry/materials, machine learning, simulation, metrology, foundations and hardware — each with a pass/warn/fail verdict and its own built-in tutor |
+| **Tutor** | A 14-lesson curriculum (`qplay learn`) from qubits to applications, a 30+ term glossary, and an in-depth tutor attached to every experiment — in the CLI and a dedicated web **Tutor** tab |
 | **Enigma lab** | Historical Enigma I / M3 / M4 (validated against the 1941 *Barbarossa* and *U-534* messages), Mini-Enigma, vectorised crib scan, key-sheet generator, reversible Grover oracles in three synthesis strategies |
 | **Backends** | `local`, `local-noisy:<preset>`, Qiskit Aer, **IBM Quantum** (SamplerV2, real devices), **IBM local testing mode** on calibrated fake devices, **Amazon Braket** (local simulator or managed devices) |
 | **Operations** | Multi-seed transpilation, preflight with native two-qubit caps, explicit real-QPU confirmation, dynamical decoupling / twirling switches, tensored readout mitigation pinned to physical qubits, persistent SQLite job store with re-analysis across sessions |
 | **Interfaces** | `qplay` CLI · zero-dependency web studio (`qplay serve`) · Python API |
+
+### The 32 experiments
+
+| Category | Experiments |
+|---|---|
+| **Security** | Grover key search (toy known-plaintext attack + key-length cost table), Q-Day resource estimator (Shor vs RSA + harvest-now-decrypt-later) |
+| **Protocols** | BB84/BBM92 QKD, E91 entanglement QKD (Bell-test security), teleportation, superdense coding, QRNG |
+| **Optimization** | QAOA portfolio (finance), QAOA maximum independent set, QAOA MaxCut |
+| **Chemistry & Materials / ML** | VQE H₂, VQE transverse-field Ising magnet + phase transition, quantum-kernel classifier |
+| **Simulation / Metrology** | Trotterized Ising dynamics, discrete-time quantum walk, GHZ-enhanced sensing (Heisenberg limit) |
+| **Oracles / Fourier** | Deutsch–Jozsa, Bernstein–Vazirani, Simon, Grover, Grover-SAT, QFT, phase estimation, Shor |
+| **Entanglement** | Bell fidelity, CHSH, GHZ |
+| **Error correction / Hardware** | Repetition code, **Shor 9-qubit code** (corrects any single-qubit error), T1/Ramsey coherence |
+| **Enigma** | Grover rotor-window search, quantum-random key sheet |
+| **Circuit Lab** | Custom circuit (JSON or OpenQASM) |
+
+All security experiments are strictly **toy-scale, synthetic and defensive** — they illustrate how quantum
+algorithms *scale* against cryptography (and why key lengths and post-quantum migration matter); they cannot attack
+any real cipher, hash, password or system.
 
 ---
 
@@ -33,11 +53,16 @@ On macOS/Linux: `scripts/install.sh` and `scripts/run_studio.sh`.
 
 ```bash
 qplay experiments                                  # list everything
+qplay learn                                        # the tutor curriculum
+qplay learn grover                                 # read a lesson
+qplay describe qkernel --tutor                     # an experiment + its tutor
 qplay run chsh                                     # exact simulation
 qplay run chsh -b local-noisy:heron_like           # density-matrix noise model
 qplay run chsh -b ibm:fake_fez                     # identical IBM pipeline, offline, with ibm_fez calibration noise
+qplay run grover_key_search                        # Grover recovers a key on a toy cipher (defensive demo)
+qplay run qaoa_portfolio                           # pick a portfolio balancing return vs risk
+qplay run shor_code -p error_type=Y                # correct an arbitrary single-qubit error
 qplay run shor -p N=21 -p a=2                      # factor 21
-qplay run enigma_grover -p message="WETTERBERICHT" -p secret_window=AAC
 qplay enigma encode "HELLO WORLD" --rotors "I II III" --positions AAA      # -> ILBDA AMTAZ
 qplay serve --open                                 # web studio on http://127.0.0.1:8765
 ```
@@ -84,14 +109,17 @@ src/quantum_playground/
   core/         circuit IR, statevector / density / reversible simulators, synthesis, noise, QASM, mitigation
   enigma/       machine models, classical crib scan + key sheets, reversible Grover oracles
   backends/     local, Aer, IBM Runtime, Braket, Qiskit bridge, SQLite job store
-  experiments/  plug-in experiments (build circuits -> analyse results -> Report)
+  experiments/  plug-in experiments (build circuits -> analyse results -> Report), each with a Tutor
+  optim/        dependency-free classical optimisers (Nelder–Mead, SPSA) for variational algorithms
+  tutor.py      the learning curriculum + glossary
   runner.py     one pipeline: plan -> preflight -> (mitigation) -> submit -> store -> analyse
   cli/          `qplay`
   web/          stdlib HTTP server + vanilla-JS single-page studio (no CDN, works offline)
 ```
 
 Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every experiment is documented in
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); the Enigma work in [docs/ENIGMA.md](docs/ENIGMA.md).
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); the learning layer in [docs/TUTOR.md](docs/TUTOR.md); the Enigma work in
+[docs/ENIGMA.md](docs/ENIGMA.md).
 
 ## What changed versus v8
 
@@ -106,9 +134,13 @@ Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every experiment is doc
 * **IBM**: the job context is persisted, so a job from a previous session is decoded and analysed (v5–v8 could not);
   DataBin parsing by register name with per-shot memory (the v4.1/v4.2 `meas` bug class is gone); local testing mode;
   readout mitigation pinned to the physical qubits actually measured.
-* **Breadth**: 21 experiments instead of a handful of demos, each with a pass/warn/fail verdict and ideal reference.
-* **Quality**: 116 pytest tests (core numerics against an independent dense-matrix reference, Qiskit operator
-  equivalence, IBM fake-device end-to-end, Braket, web API security guards), GitHub Actions CI.
+* **Breadth**: 32 experiments instead of a handful of demos, spanning security, optimization, chemistry, machine
+  learning, simulation, metrology and error correction — each with a pass/warn/fail verdict and an ideal reference.
+* **Learning**: a 14-lesson curriculum and a per-experiment tutor, in the CLI (`qplay learn`) and a web Tutor tab,
+  informed by a deep web survey of real-world quantum applications.
+* **Quality**: 157 pytest tests (core numerics against an independent dense-matrix reference, Qiskit operator
+  equivalence, the Shor code verified against every single-qubit error, IBM fake-device end-to-end, Braket, web API
+  security guards, the tutor and curriculum), GitHub Actions CI.
 
 ## Honest boundaries (kept from v5–v8, and still true)
 
@@ -124,5 +156,14 @@ Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every experiment is doc
 
 ```bash
 pip install -e ".[all]"
-pytest            # ~2 minutes; tests that need optional SDKs skip automatically when they are missing
+pytest            # ~2.5 minutes; tests that need optional SDKs skip automatically when they are missing
 ```
+
+## Safety and scope of the security experiments
+
+The security experiments (`grover_key_search`, `qday_estimator`) and the Enigma lab are **defensive and educational**.
+They use toy, synthetic ciphers and self-chosen secrets to illustrate how quantum algorithms *scale* against
+cryptography — why Grover halves symmetric-key strength (so AES-256, not AES-128) and why Shor forces the migration to
+post-quantum cryptography for long-lived secrets. They cannot attack any real cipher, hash, password, account or
+system, and no real-world target is involved. See each experiment's tutor (`qplay learn exp:grover_key_search`) for the
+full caveats.

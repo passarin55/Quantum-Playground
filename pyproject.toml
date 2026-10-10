@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantum-playground-studio"
-version = "9.0.0"
-description = "Over-engineered quantum computing playground: simulators, 17 runnable experiments, a full Enigma lab (classical + Grover), and IBM Quantum / AWS Braket cloud execution."
+version = "9.1.0"
+description = "Over-engineered quantum computing playground: simulators, 32 runnable experiments with tutors, a full Enigma lab (classical + Grover), and IBM Quantum / AWS Braket cloud execution."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Quantum Playground contributors" }]

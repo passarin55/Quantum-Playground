@@ -8,7 +8,7 @@ from typing import Optional
 
 from ..core.circuit import Circuit
 from ..core.statevector import exact_distribution
-from .base import Chart, Experiment, Param, Plan, Report, Table, counts_chart, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, counts_chart, register
 from .library import dot2, parse_bitstring_list, rng_from
 
 
@@ -19,6 +19,28 @@ def _bits(v: int, n: int) -> str:
 @register
 class DeutschJozsa(Experiment):
     id = "deutsch_jozsa"
+    tutor = Tutor(
+        concept="The Deutsch–Jozsa algorithm answers a yes/no question about a hidden function in a SINGLE query, where "
+                "a classical computer might need exponentially many. It's the first proof that quantum can beat classical.",
+        how_it_works="Put all input qubits in superposition, run the oracle once with the output qubit in |−⟩ so it "
+                     "stamps a phase (−1)^f(x) onto each branch, then apply Hadamards again. Interference makes the "
+                     "all-zeros outcome certain if f is constant, and impossible if f is balanced.",
+        intuition="You don't evaluate f on every input in parallel and 'read them all' — you can only read one answer. "
+                  "The trick is interference: arrange the phases so the branches you don't want cancel out and the "
+                  "answer you do want adds up.",
+        misconception="Quantum speedups are NOT 'try all answers at once then look'. Measurement gives one outcome. The "
+                      "power is in engineering interference so the useful information survives and the rest cancels.",
+        what_to_look_for="Measure the input register: all zeros → constant, anything else → balanced. One shot suffices "
+                         "in the ideal case; the report shows P(00…0).",
+        try_this=["Flip oracle between balanced / constant0 / constant1 and confirm the verdict.",
+                  "Increase n: classically the worst case needs 2^(n−1)+1 queries; here it's still one.",
+                  "Run on a noisy backend and see how many shots you need to be confident."],
+        real_world_use="Deutsch–Jozsa is pedagogical, but phase kickback and interference — the ideas it isolates — are "
+                       "the engine inside Grover, Shor and phase estimation.",
+        going_deeper="Bernstein–Vazirani uses the same trick to read out a whole hidden string, not just one bit.",
+        references=[{"title": "Deutsch–Jozsa algorithm", "url": "https://en.wikipedia.org/wiki/Deutsch%E2%80%93Jozsa_algorithm"}],
+        prerequisites=["bell_states"],
+    )
     title = "Deutsch–Jozsa: constant vs balanced in one query"
     category = "Oracles"
     summary = "Decide whether f:{0,1}^n→{0,1} is constant or balanced with a single oracle call."
@@ -63,6 +85,27 @@ class DeutschJozsa(Experiment):
 @register
 class BernsteinVazirani(Experiment):
     id = "bernstein_vazirani"
+    tutor = Tutor(
+        concept="Given a black box computing f(x) = s·x (mod 2) for a hidden n-bit string s, Bernstein–Vazirani "
+                "recovers ALL of s in one query. Classically you need n queries — one per bit.",
+        how_it_works="Same recipe as Deutsch–Jozsa: superpose the inputs, run the oracle once with phase kickback so "
+                     "each bit of s becomes a phase, then Hadamard everything. The interference deposits s directly into "
+                     "the measured bitstring.",
+        intuition="Each Hadamard sandwich converts 'is bit i set?' from a value you'd have to probe into a phase the "
+                  "final Hadamards read off in parallel. One query, because the oracle touches all bits at once.",
+        misconception="The oracle isn't 'cheating' by containing s plainly — s is encoded only in which qubits the "
+                      "oracle's CNOTs target. The algorithm's job is to read that structure out in one shot.",
+        what_to_look_for="The single most-frequent measurement IS the hidden string s. The report shows P(s); on an "
+                         "ideal backend it's 1.0.",
+        try_this=["Change the `secret` to any bitstring and confirm it's recovered exactly.",
+                  "Leave secret empty for a random 6-bit string.",
+                  "Run on ibm:fake_fez: note popcount(s) CNOTs, so sparser secrets survive noise better."],
+        real_world_use="BV is the ancestor of the hidden-subgroup algorithms (Simon, Shor). The 'learn a linear "
+                       "function from one quantum query' idea also appears in quantum learning theory.",
+        going_deeper="Simon's problem keeps the hidden-string flavour but makes the classical cost exponential.",
+        references=[{"title": "Bernstein–Vazirani algorithm", "url": "https://en.wikipedia.org/wiki/Bernstein%E2%80%93Vazirani_algorithm"}],
+        prerequisites=["deutsch_jozsa"],
+    )
     title = "Bernstein–Vazirani: read a hidden string in one query"
     category = "Oracles"
     summary = "Recover s from f(x) = s·x mod 2 with one query (classically n queries)."
@@ -100,6 +143,29 @@ class BernsteinVazirani(Experiment):
 @register
 class Simon(Experiment):
     id = "simon"
+    tutor = Tutor(
+        concept="Simon's problem hides a secret string s such that f(x) = f(x⊕s). Finding s classically takes "
+                "exponentially many queries; quantumly it takes about n. This exponential gap directly inspired Shor.",
+        how_it_works="Entangle an input register with an output register through f, then measure the output. The input "
+                     "collapses to a two-element superposition {x, x⊕s}. A Hadamard transform turns that into a random "
+                     "bitstring y guaranteed to satisfy y·s = 0. Collect n−1 independent y's and solve the linear system "
+                     "over GF(2) to pull out s.",
+        intuition="Each run doesn't reveal s, only one random linear equation that s must obey. A handful of equations "
+                  "pins s down. The quantum part is efficiently sampling those constraints; the solving is classical.",
+        misconception="A single run doesn't give the answer — you need several, then classical linear algebra. The "
+                      "'speedup' is in how cheaply each constraint is harvested.",
+        what_to_look_for="Every measured y should satisfy y·s = 0. The report scores candidate s values by how "
+                         "consistent they are with the measured y's and recovers the best non-zero one.",
+        try_this=["Change the `secret` and confirm recovery.",
+                  "Note the number of distinct outcomes ≈ 2^(n−1) — half the space, the signature of the 2-to-1 map.",
+                  "Run on a noisy backend and see how consistency degrades."],
+        real_world_use="Simon's algorithm is the template for the hidden-subgroup problem that Shor's factoring is a "
+                       "special case of; it also breaks certain symmetric constructions (e.g. Even–Mansour) in the "
+                       "quantum query model.",
+        going_deeper="Shor replaces the XOR-period with a modular-multiplication period and uses the QFT to find it.",
+        references=[{"title": "Simon's problem", "url": "https://en.wikipedia.org/wiki/Simon%27s_problem"}],
+        prerequisites=["bernstein_vazirani"],
+    )
     title = "Simon's algorithm: find the hidden period s"
     category = "Oracles"
     summary = "f(x) = f(x ⊕ s): each run yields y with y·s = 0; GF(2) post-processing recovers s."
@@ -173,6 +239,31 @@ def _theory(N: int, M: int, k: int) -> float:
 @register
 class Grover(Experiment):
     id = "grover"
+    tutor = Tutor(
+        concept="Grover's algorithm finds a needle in an unsorted haystack of N items in about √N steps, versus N/2 for "
+                "any classical search. It's the most broadly applicable quantum speedup — a quadratic boost for brute force.",
+        how_it_works="Start in an equal superposition of all N candidates. Repeat two steps: an ORACLE that flips the "
+                     "sign of the marked item(s), then a DIFFUSER that reflects all amplitudes about their average. Each "
+                     "round rotates probability toward the answer; after ≈(π/4)√N rounds, measuring almost certainly "
+                     "returns a marked item.",
+        intuition="Picture amplitudes as arrows. The oracle flips the target's arrow below the axis; the diffuser "
+                  "'inverts about the mean', which makes the flipped arrow grow. Repeat and the target towers over the rest.",
+        misconception="More iterations is NOT always better — amplitude amplification OVERSHOOTS. Past the optimal count "
+                      "the success probability falls again, like a pendulum. The quadratic speedup also can't be improved: "
+                      "Grover is provably optimal for unstructured search.",
+        what_to_look_for="Success probability near 1 at the optimal iteration count. The report plots P(success) vs "
+                         "iterations — watch it rise then fall. With M marked items the optimum is ≈(π/4)√(N/M).",
+        try_this=["Set iterations beyond the optimum and watch success DROP — the overshoot.",
+                  "Mark several states at once and see the optimal iteration count shrink.",
+                  "Grow n toward 8–10 and watch hardware noise wash out the peak on ibm:fake_fez."],
+        real_world_use="Grover accelerates brute-force search anywhere: database lookup, constraint satisfaction, and — "
+                       "crucially for security — guessing symmetric keys and hash preimages, which is why AES-128 is "
+                       "considered to have only ~64 bits of quantum security. See the password-search demo.",
+        going_deeper="Grover-SAT builds a real logical oracle; the Enigma lab amplifies a cryptographic key; amplitude "
+                     "amplification generalises the diffuser to arbitrary starting states.",
+        references=[{"title": "Grover's algorithm", "url": "https://en.wikipedia.org/wiki/Grover%27s_algorithm"}],
+        prerequisites=["deutsch_jozsa"],
+    )
     title = "Grover search over marked basis states"
     category = "Oracles"
     summary = "Amplitude amplification: find marked items among N = 2^n in ~π/4·√(N/M) iterations."
@@ -251,6 +342,28 @@ def parse_cnf(text: str) -> tuple[list[str], list[list[tuple[str, bool]]]]:
 @register
 class GroverSAT(Experiment):
     id = "grover_sat"
+    tutor = Tutor(
+        concept="This turns Grover from a toy (mark a known state) into a real solver: it builds a reversible quantum "
+                "circuit that RECOGNISES satisfying assignments of a Boolean formula, then amplifies them.",
+        how_it_works="Each clause (OR of literals) is computed into an ancilla qubit with one multi-controlled gate "
+                     "using mixed-polarity controls. A final multi-controlled Z fires only when every clause ancilla is "
+                     "satisfied, stamping the phase; then the clause computation is reversed (uncomputed) to clean the "
+                     "ancillas. That whole block is the Grover oracle.",
+        intuition="The oracle doesn't know the answers — it checks them. Amplitude amplification then boosts whichever "
+                  "assignments pass the check. The classical solution count is used only to pick the iteration number.",
+        misconception="This doesn't make NP-complete problems easy: Grover gives a quadratic (√), not exponential, "
+                      "speedup over brute force, and building the oracle costs real gates. It's a speedup, not magic.",
+        what_to_look_for="The most frequent assignments should satisfy the formula. The report tags each by whether it "
+                         "satisfies, and compares P(solution) to the ideal amplified value and to random guessing.",
+        try_this=["Edit the CNF formula and watch the solver find its satisfying assignments.",
+                  "Use an unsatisfiable formula and see amplification fail (no solutions to amplify).",
+                  "Add more variables and inspect the growing ancilla/depth cost in the circuit preview."],
+        real_world_use="Oracle-based Grover search underlies quantum approaches to constraint satisfaction, verification "
+                       "and — as the Enigma lab shows — cryptographic key search.",
+        going_deeper="The Enigma Grover lab is a cryptographic SAT: 'which key encrypts this plaintext to this ciphertext?'",
+        references=[{"title": "Boolean satisfiability problem", "url": "https://en.wikipedia.org/wiki/Boolean_satisfiability_problem"}],
+        prerequisites=["grover"],
+    )
     title = "Grover SAT solver (reversible CNF oracle)"
     category = "Oracles"
     summary = "Builds a clause-by-clause reversible oracle for a CNF formula and amplifies satisfying assignments."

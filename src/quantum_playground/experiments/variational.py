@@ -9,7 +9,7 @@ import numpy as np
 from ..core.circuit import Circuit
 from ..core.statevector import Statevector
 from ..optim import multistart, nelder_mead, spsa
-from .base import Chart, Experiment, Param, Plan, Report, Table, counts_chart, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, counts_chart, register
 
 # H2 at 0.735 Å, STO-3G, parity mapping with two-qubit reduction (Qiskit Nature reference values).
 # Pauli strings in Qiskit order (left = qubit 1).
@@ -53,6 +53,31 @@ def _energy_exact(theta, kind: str) -> float:
 @register
 class VQEH2(Experiment):
     id = "vqe_h2"
+    tutor = Tutor(
+        concept="The Variational Quantum Eigensolver finds the lowest energy (ground state) of a molecule — the quantity "
+                "that determines its structure and reactivity — on today's noisy hardware. It's quantum chemistry's "
+                "flagship near-term application.",
+        how_it_works="A classical optimiser tunes the angles of a short parameterised circuit (the 'ansatz'). For each "
+                     "setting, the quantum device prepares the trial state and MEASURES the energy ⟨H⟩ by sampling the "
+                     "Hamiltonian's Pauli terms in commuting groups (Z-basis and X-basis here). The optimiser walks the "
+                     "angles downhill until the energy stops dropping.",
+        intuition="The variational principle guarantees any trial energy is ≥ the true ground energy, so 'lowest wins'. "
+                  "The quantum computer is a fast energy-evaluator inside a classical optimisation loop — a hybrid algorithm.",
+        misconception="VQE isn't pure quantum magic: it's a quantum-classical loop, its answer is only as good as the "
+                      "ansatz, and it can get stuck in local minima or on 'barren plateaus' where gradients vanish. It "
+                      "trades Shor-style depth for many shallow measurements.",
+        what_to_look_for="Measured energy close to the exact diagonalisation value. 'Chemical accuracy' is 1.6 mHa; the "
+                         "report flags whether you're within it (or within shot noise of it).",
+        try_this=["Switch optimizer between nelder_mead and spsa (SPSA is built for noisy measurements).",
+                  "Run on ibm:fake_fez with --mitigate-readout and watch the energy error shrink.",
+                  "Compare ucc1 vs hardware_efficient ansatz."],
+        real_world_use="VQE and its successors target battery materials, catalysts and drug molecules — the cases where "
+                       "classical chemistry scales badly. Companies and national labs run VQE pilots on real QPUs today.",
+        going_deeper="QAOA is VQE's optimisation cousin; phase estimation is the fault-tolerant alternative once error "
+                     "correction arrives.",
+        references=[{"title": "Variational quantum eigensolver", "url": "https://en.wikipedia.org/wiki/Variational_quantum_eigensolver"}],
+        prerequisites=["bell_states"],
+    )
     title = "VQE: ground-state energy of H₂"
     category = "Variational"
     summary = "Optimise an ansatz classically, then measure ⟨H⟩ on the chosen backend (Z and X groups)."
@@ -160,6 +185,31 @@ def _qaoa_circuit(n, edges, gammas, betas, measure=True) -> Circuit:
 @register
 class QAOAMaxCut(Experiment):
     id = "qaoa_maxcut"
+    tutor = Tutor(
+        concept="The Quantum Approximate Optimization Algorithm attacks hard combinatorial problems — here MaxCut, "
+                "splitting a graph's nodes into two groups to cut the most edges — by encoding the objective into a "
+                "quantum circuit and tuning it toward good solutions.",
+        how_it_works="Start in an equal superposition of all partitions. Alternate two layers p times: a COST layer "
+                     "(RZZ on each edge) that imprints each cut's value as a phase, and a MIXER layer (RX on every qubit) "
+                     "that spreads amplitude between partitions. A classical optimiser picks the layer angles (γ, β). "
+                     "Measuring samples high-cut partitions more often.",
+        intuition="Cost phases make good cuts 'heavier'; the mixer lets amplitude flow toward them. More layers p give a "
+                  "closer approximation, interpolating toward adiabatic quantum optimisation at large p.",
+        misconception="QAOA is a HEURISTIC — it returns good (not provably optimal) cuts, and whether it beats classical "
+                      "solvers is still open and problem-dependent. The win is an approximation ratio, demonstrated here "
+                      "against a brute-force optimum.",
+        what_to_look_for="The sampled average cut and the approximation ratio vs the brute-force maximum, plus P(optimal "
+                         "cut). Compare to random guessing and to the ideal expectation for your p.",
+        try_this=["Edit the graph `edges` and add layers (p) to push the approximation ratio up.",
+                  "Try a triangle (odd cycle) — frustrated graphs are where MaxCut gets interesting.",
+                  "Run on ibm:fake_fez: each edge costs two CX per layer, so watch depth vs noise."],
+        real_world_use="MaxCut-style QUBOs model portfolio optimisation, logistics/routing, scheduling and network "
+                       "design; banks and logistics firms pilot QAOA and quantum annealing on exactly these.",
+        going_deeper="The portfolio-optimization and max-independent-set experiments apply the same QAOA machinery to "
+                     "money and networks.",
+        references=[{"title": "Quantum approximate optimization algorithm", "url": "https://en.wikipedia.org/wiki/Quantum_optimization_algorithms"}],
+        prerequisites=["bell_states"],
+    )
     title = "QAOA for MaxCut"
     category = "Variational"
     summary = "Optimise QAOA angles exactly, sample cuts on the backend, compare with brute force."

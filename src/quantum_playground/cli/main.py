@@ -89,6 +89,52 @@ def cmd_describe(a) -> int:
         elif p["min"] is not None:
             rng = f" range=[{p['min']}, {p['max']}]"
         print(f"  {p['name']:<16} {p['kind']:<7} default={p['default']!r}{rng}\n      {p['help']}")
+    exp = get_experiment(a.experiment)
+    if getattr(a, "tutor", False) and exp.tutor and exp.tutor.concept:
+        print("\n" + exp.tutor.to_text(exp.title))
+    elif exp.tutor and exp.tutor.concept:
+        print(f"\nTutor available: qplay learn {a.experiment}")
+    return 0
+
+
+def cmd_learn(a) -> int:
+    from ..experiments import get_experiment
+    from ..tutor import CURRICULUM, GLOSSARY, format_lesson, lesson_by_id
+    if a.topic in (None, "", "curriculum", "index"):
+        print("Quantum Playground Tutor — curriculum\n")
+        level = None
+        for lsn in CURRICULUM:
+            if lsn.level != level:
+                level = lsn.level
+                print(f"\n[{level.upper()}]")
+            print(f"  {lsn.id:<22} {lsn.title}")
+        print("\nRead a lesson:  qplay learn <lesson-id>")
+        print("An experiment:  qplay learn exp:<experiment-id>   (or: qplay describe <id> --tutor)")
+        print("Glossary term:  qplay learn term:<word>")
+        return 0
+    topic = a.topic
+    if topic == "glossary":
+        for term, definition in sorted(GLOSSARY.items()):
+            print(f"{term}\n    {definition}\n")
+        return 0
+    if topic.startswith("term:"):
+        key = topic[5:].strip().lower()
+        hit = next((f"{t}: {d}" for t, d in GLOSSARY.items() if t.lower() == key), None)
+        print(hit or f"No glossary entry for {key!r}. Try: qplay learn glossary")
+        return 0 if hit else 1
+    if topic.startswith("exp:"):
+        exp = get_experiment(topic[4:])
+        if not (exp.tutor and exp.tutor.concept):
+            print(f"No tutor for {exp.id}.")
+            return 1
+        print(exp.tutor.to_text(exp.title))
+        return 0
+    lsn = lesson_by_id(topic)
+    if lsn is None:
+        from ..tutor import CURRICULUM
+        print(f"Unknown topic {topic!r}. Lessons: {', '.join(l.id for l in CURRICULUM)}")
+        return 1
+    print(format_lesson(lsn))
     return 0
 
 
@@ -262,7 +308,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("experiments", help="list experiments").set_defaults(fn=cmd_experiments)
     d = sub.add_parser("describe", help="describe an experiment")
     d.add_argument("experiment")
+    d.add_argument("--tutor", action="store_true", help="also print the experiment's tutor lesson")
     d.set_defaults(fn=cmd_describe)
+
+    lrn = sub.add_parser("learn", help="built-in quantum tutor (curriculum, lessons, glossary)")
+    lrn.add_argument("topic", nargs="?", help="lesson id, 'glossary', 'term:<word>', or 'exp:<experiment-id>'")
+    lrn.set_defaults(fn=cmd_learn)
 
     c = sub.add_parser("circuit", help="print an experiment's circuits")
     c.add_argument("experiment")

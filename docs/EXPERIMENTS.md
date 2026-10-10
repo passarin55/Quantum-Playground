@@ -3,6 +3,26 @@
 Generated from the registry (`python scripts/gen_experiment_docs.py`). Run any of them with
 `qplay run <id> [-p name=value ...] [-b backend]`; every report carries a pass/warn/fail verdict.
 
+## Chemistry & Materials
+
+### `vqe_ising` — VQE: quantum magnet ground state & phase transition
+
+Find the ground state of a transverse-field Ising spin chain with VQE, and sweep the field to watch a quantum phase transition — the kind of materials problem quantum computers target.
+
+The transverse-field Ising model H = −J Σ ZᵢZᵢ₊₁ − h Σ Xᵢ is the textbook quantum magnet: at small field h the spins order (ferromagnet); at large h they align with the field (paramagnet), with a quantum phase transition between. VQE optimises a hardware-efficient ansatz to approximate the ground energy, measured on the backend from Z- and X-basis groups. The report compares to exact diagonalisation and reports the magnetisation order parameter.
+
+*Hardware:* n qubits (default 6), a linear CX entangler — a realistic condensed-matter demo on hardware.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `spins` | int | `6` | Number of spins (qubits) |
+| `coupling` | float | `1.0` | Ising coupling J |
+| `field` | float | `0.5` | Transverse field h (h≈J is near the transition) |
+| `layers` | int | `2` | Ansatz entangling layers |
+| `optimizer` | choice (nelder_mead, spsa) | `nelder_mead` | Optimiser |
+
+Default shots: 2000
+
 ## Circuit Lab
 
 ### `custom` — Custom circuit
@@ -140,6 +160,23 @@ Errors are injected as coherent rotations RX(θ) (bit-flip code) or RZ(θ) (phas
 
 Default shots: 2000
 
+### `shor_code` — Shor's 9-qubit code: correcting any single-qubit error
+
+Encode one logical qubit in nine, inject any single-qubit error (bit, phase or both), measure the stabilizers, and watch feed-forward correction recover the logical state — real quantum error correction.
+
+The Shor code concatenates a 3-qubit phase-flip code with 3-qubit bit-flip codes, so it corrects an arbitrary single-qubit error — the first code to do so. This runs the full cycle: encode a logical |0⟩ or |1⟩, inject a chosen Pauli error, measure the eight stabilizers with a reused ancilla (mid-circuit measurement), decode the syndrome and apply the correction via classical feed-forward, then measure the logical qubit. Any single X, Y or Z error is detected and fixed.
+
+*Hardware:* 9 data + 1 reused ancilla = 10 qubits, with mid-circuit measurement, reset and feed-forward — needs a dynamic-circuit backend (local, or ibm:fake_*).
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `logical` | int | `1` | Logical state to protect (0 or 1) |
+| `error_type` | choice (I, X, Y, Z) | `Y` | Injected single-qubit error |
+| `error_qubit` | int | `4` | Qubit the error hits (0–8) |
+| `correct` | bool | `True` | Apply feed-forward correction |
+
+Default shots: 512
+
 ## Fourier
 
 ### `qft` — Quantum Fourier transform: round trip and period finding
@@ -180,6 +217,81 @@ Controlled multiplication by a^(2^k) mod N is compiled as an exact permutation o
 | `N` | int | `15` | Number to factor (odd composite, ≤ 63) |
 | `a` | int | `7` | Base coprime to N |
 | `t` | int | `0` | Counting qubits (0 = 2·⌈log2 N⌉, capped at 12) |
+
+Default shots: 2000
+
+## Machine Learning
+
+### `qkernel` — Quantum-kernel classifier (machine learning)
+
+Embed data into quantum states, estimate a quantum kernel on the backend, and classify a 2D dataset — then compare the decision boundary to a classical kernel.
+
+Quantum machine learning via kernels. Each 2D point is embedded by a feature-map circuit into a 2-qubit state; the kernel K(x,x') = |⟨φ(x')|φ(x)⟩|² is estimated on the backend by running U(x')†U(x) and measuring the all-zeros probability. A kernel classifier (nearest class by mean kernel) then labels test points. The report compares quantum-kernel accuracy to a classical RBF kernel on the same split.
+
+*Hardware:* 2 qubits; one overlap circuit per (train,point) pair — many shallow circuits, ideal for batching.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `dataset` | choice (circles, xor, linear) | `circles` | Synthetic dataset |
+| `train` | int | `12` | Training points |
+| `test` | int | `6` | Test points |
+| `reps` | int | `2` | Feature-map repetitions (depth/expressibility) |
+| `seed` | int | `1` | Dataset seed |
+
+Default shots: 2048
+
+## Metrology
+
+### `ghz_metrology` — GHZ-enhanced sensing (Heisenberg-limit metrology)
+
+Entangled GHZ probes sense a phase N times more sharply than N independent qubits — beating the standard quantum limit, the basis of quantum-enhanced sensors.
+
+A sensor estimates an unknown phase φ. With N independent qubits (standard Ramsey interferometry) the signal oscillates as cos(φ) and precision improves as √N (the standard quantum limit). With an N-qubit GHZ state the accumulated phase is Nφ, so the parity oscillates as cos(Nφ) — N times faster — giving precision ∝ N (the Heisenberg limit). This experiment sweeps φ and measures both signals, extracting the N-fold frequency gain.
+
+*Hardware:* Sweeps N; each point is an N-qubit GHZ parity measurement. GHZ fragility limits useful N on hardware.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `n` | int | `4` | Number of entangled probe qubits N |
+| `phases` | int | `32` | Phase points sampled |
+| `phase_span` | float | `1.0` | Phase sweep span in full single-qubit periods (2π) |
+
+Default shots: 2000
+
+## Optimization
+
+### `qaoa_mis` — QAOA maximum independent set (scheduling / networks)
+
+Find the largest set of mutually non-conflicting items — wireless channels, compatible jobs, non-adjacent nodes — as a QUBO solved with QAOA.
+
+Maximum independent set: pick the most vertices of a graph with no edge between any two. It models conflict-free allocation (frequencies, time slots, non-interfering transmitters). As a QUBO we maximise the number chosen minus a penalty for every conflicting pair selected, then solve with QAOA and compare to the brute-force maximum.
+
+*Hardware:* One qubit per vertex (default from the graph); each edge is an RZZ per layer.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `edges` | str | `0-1,1-2,2-3,3-4,4-0,0-2` | Graph edges a-b, comma separated |
+| `penalty` | float | `3.0` | Conflict penalty λ (≥ 2 guarantees independence) |
+| `layers` | int | `2` | QAOA layers p |
+
+Default shots: 2000
+
+### `qaoa_portfolio` — QAOA portfolio optimization (finance)
+
+Pick the best B of n assets to balance expected return against risk, encoded as a QUBO and solved with QAOA — the canonical quantum-finance use case.
+
+Mean-variance portfolio selection: maximise expected return μ·x minus risk-aversion q·(xᵀΣx), subject to choosing exactly B assets (a budget penalty λ(Σxᵢ−B)²). This becomes a QUBO, maps to an Ising Hamiltonian, and QAOA samples low-'energy' (high-quality) portfolios. The report compares the sampled portfolio to the brute-force optimum and checks the budget constraint.
+
+*Hardware:* One qubit per asset (default 6). Each asset pair contributes an RZZ per layer.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `assets` | int | `6` | Number of candidate assets |
+| `budget` | int | `3` | Assets to hold (budget) |
+| `risk_aversion` | float | `0.5` | Risk-aversion q (higher = more cautious) |
+| `penalty` | float | `2.0` | Budget-constraint penalty strength λ |
+| `layers` | int | `2` | QAOA layers p |
+| `seed` | int | `7` | Seed for the synthetic market (returns/covariance) |
 
 Default shots: 2000
 
@@ -276,6 +388,23 @@ BB84: Alice prepares random bits in random Z/X bases (one shot per round); Bob m
 
 Default shots: 1
 
+### `e91_qkd` — E91 entanglement-based QKD with a Bell-test security certificate
+
+Ekert's protocol: Alice and Bob build a shared key from entangled pairs, and a CHSH Bell test on the leftover rounds CERTIFIES no one is listening — security from physics, not assumptions.
+
+Bell pairs are shared; Alice measures at angles {0°,45°,90°} and Bob at {45°,90°,135°}, chosen at random. Rounds where they picked the same angle (45° or 90°) are perfectly correlated and become the key. The remaining angle combinations feed a CHSH estimate: a genuine entangled channel gives S ≈ 2√2, but an intercept-resend eavesdropper breaks the entanglement and drags S toward 2 while injecting key errors. If S ≤ 2, the parties abort.
+
+*Hardware:* 2 qubits per pair per circuit; many rounds. Shares the CHSH and BB84 machinery.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `rounds` | int | `60` | Measurement rounds (circuits) |
+| `pairs` | int | `4` | Entangled pairs per round |
+| `eve` | float | `0.0` | Fraction of pairs an eavesdropper intercepts |
+| `seed` | int | `91` | Seed for angle choices (-1 = random) |
+
+Default shots: 1
+
 ### `qrng` — Quantum random number generator + randomness tests
 
 Measure |+⟩ states, test the bits (NIST-style monobit/runs, χ²) and extract with Toeplitz hashing.
@@ -310,6 +439,80 @@ Teleport RY(θ)RZ(φ)|0⟩ from q0 to q2 and reconstruct it on Bob's side.
 | `theta` | float | `1.0` | Polar angle θ (rad) |
 | `phi` | float | `0.7` | Azimuth φ (rad) |
 | `mode` | choice (dynamic, deferred) | `dynamic` | Correction style |
+
+Default shots: 2000
+
+## Security
+
+### `grover_key_search` — Grover key search: a quantum known-plaintext attack (toy cipher)
+
+Encrypt a message with a secret key on a tiny toy cipher, then let Grover recover the key from known plaintext/ciphertext pairs — and see the quadratic speedup that halves symmetric-key strength.
+
+A SYNTHETIC demonstration of why quantum computers worry symmetric cryptography. A small public toy cipher E_key encrypts chosen plaintext blocks under a secret key. Grover's algorithm searches the key space: a reversible oracle encrypts the known plaintext(s) under every candidate key in superposition, marks the key(s) that reproduce the known ciphertext(s), and amplitude amplification concentrates the measurement on the real key in ≈(π/4)√N steps instead of ≈N/2 classical trials. The report then extrapolates this √ speedup to real key lengths (why AES-128 has ~64-bit quantum security and AES-256 restores safety). It cannot attack any real cipher — the only secret is the one this experiment chose.
+
+*Hardware:* key+block qubits (2×width) + one flag per pair. Deep for width>4 due to the S-box permutation; start on the simulator, then try width=3 on ibm:fake_fez.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `width` | int | `4` | Key and block size in bits |
+| `pairs` | int | `2` | Known plaintext/ciphertext pairs the attacker has |
+| `rounds` | int | `3` | Toy-cipher rounds |
+| `secret_key` | int | `-1` | Secret key to recover (-1 = pick one for you) |
+| `iterations` | int | `-1` | Grover iterations (-1 = optimal for the solution count) |
+
+Default shots: 2000
+
+### `qday_estimator` — Q-Day resource estimator: is my encryption quantum-safe?
+
+Factor 15 with Shor as a live proof the quantum attack is real, then estimate what breaking RSA/ECC would actually take — and whether 'harvest now, decrypt later' threatens your data.
+
+The public-key counterpart to Grover key search. It runs a genuine Shor order-finding circuit to factor 15, then presents published resource estimates for breaking real RSA/ECC: logical and physical qubit counts and runtimes (Gidney–Ekerå 2019: ~20M physical qubits for RSA-2048; 2025 improvements: <1M). A 'harvest now, decrypt later' calculator flags whether data with a given secrecy lifetime is at risk before an estimated Q-Day, and a symmetric-key table shows Grover's gentler (quadratic) threat. The estimates are order-of-magnitude teaching figures from the cited literature, not predictions.
+
+*Hardware:* Reuses the Shor N=15 circuit (12 qubits). The estimates themselves use no qubits.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `rsa_bits` | int | `2048` | RSA modulus size to estimate (bits) |
+| `secret_lifetime_years` | int | `15` | How long your data must stay secret |
+| `q_day_year` | int | `2035` | Assumed year a cryptographically-relevant quantum computer arrives |
+| `today_year` | int | `2026` | Current year (for the harvest-now-decrypt-later clock) |
+
+Default shots: 2000
+
+## Simulation
+
+### `quantum_walk` — Discrete-time quantum walk on a line
+
+A quantum walker spreads BALLISTICALLY (distance ∝ steps), quadratically faster than a classical random walk (distance ∝ √steps) — the engine behind several quantum algorithms.
+
+A coined quantum walk: a coin qubit is flipped by a Hadamard each step, and the walker moves right or left on a position register depending on the coin, in superposition. Interference makes the probability spread much faster than a classical random walk. The report measures the standard deviation of position after T steps and compares it to the classical √T scaling.
+
+*Hardware:* 1 coin + m position qubits (default 5 → 32 sites); the shift is a controlled increment/decrement.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `position_qubits` | int | `5` | Position register size (2^m sites) |
+| `steps` | int | `8` | Walk steps |
+| `coin` | choice (symmetric, right, left) | `symmetric` | Initial coin state |
+
+Default shots: 2000
+
+### `tfim_dynamics` — Trotterized spin dynamics (quantum simulation)
+
+Watch a quantum magnet evolve in real time: Trotterize e^{-iHt} for the transverse-field Ising model and track the magnetization, the task quantum computers are naturally suited to.
+
+Simulating how a quantum system changes in time is the original motivation for quantum computers (Feynman). Here the transverse-field Ising chain H = −J Σ ZᵢZᵢ₊₁ − h Σ Xᵢ is evolved from the all-up state by Trotterization: each small time step applies the ZZ couplings (RZZ) then the transverse field (RX). The magnetization ⟨Σ Zᵢ⟩/n is measured over time and compared to the exact evolution, exposing Trotter error.
+
+*Hardware:* n qubits (default 6); depth grows with Trotter steps — a core NISQ-era benchmark.
+
+| parameter | type | default | description |
+|---|---|---|---|
+| `spins` | int | `6` | Spins (qubits) |
+| `coupling` | float | `1.0` | Ising coupling J |
+| `field` | float | `1.0` | Transverse field h |
+| `total_time` | float | `3.0` | Total evolution time |
+| `points` | int | `10` | Time points sampled |
+| `trotter_steps` | int | `6` | Trotter steps per time point |
 
 Default shots: 2000
 

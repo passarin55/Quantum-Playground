@@ -8,13 +8,39 @@ from ..enigma import (BitSource, EnigmaConfig, build_grover_circuit, encrypt, ge
                       historical_problem, letters, mini_encrypt, mini_problem, optimal_iterations,
                       success_probability)
 from ..enigma.machine import ABC
-from .base import Chart, Experiment, Param, Plan, Report, Table, counts_chart, register
+from .base import Chart, Experiment, Param, Plan, Report, Table, Tutor, counts_chart, register
 from .library import bits_to_hex
 
 
 @register
 class EnigmaGrover(Experiment):
     id = "enigma_grover"
+    tutor = Tutor(
+        concept="This is Grover's algorithm aimed at a real cipher: given a plaintext/ciphertext pair, it searches for "
+                "the secret Enigma rotor setting that links them — a quantum spin on the codebreaking that won WWII.",
+        how_it_works="The unknown is one rotor's start window among 2^b candidates. A quantum oracle runs the ACTUAL "
+                     "Enigma wiring as a reversible circuit on a 5-qubit letter register, for all candidate keys in "
+                     "superposition, and phase-marks the key that maps the crib plaintext to the known ciphertext. "
+                     "Grover amplification then concentrates the measurement on that key.",
+        intuition="The oracle doesn't store the answer — it re-encrypts under each candidate key and checks the result, "
+                  "exactly as a codebreaker would, but on all keys at once. Grover boosts whichever key passes the check.",
+        misconception="This is NOT a practical Enigma cracker and claims no speedup over classical codebreaking. A "
+                      "classical scan of all 17,576 rotor windows takes milliseconds; the quantum search is a small, "
+                      "educational restricted search. The 26-letter oracle is far beyond today's hardware — only the "
+                      "Mini-Enigma runs meaningfully on a real QPU. It attacks a synthetic toy, not any live system.",
+        what_to_look_for="The most frequent measured key should decode to the real setting, and the report decrypts the "
+                         "whole message with it. P(crib-consistent key) vs random tells you how well amplification worked.",
+        try_this=["Run model=mini on ibm:fake_fez — small enough to see real amplification on a device model.",
+                  "Increase crib_length to 2 to disambiguate when several 1-letter keys match.",
+                  "Use 'Compare oracle synthesis' (web) or inspect the circuit to see staged vs factored vs compiled cost."],
+        real_world_use="Demonstrates concretely why symmetric cryptography worried about Grover (quadratic key-search "
+                       "speedup) and why key lengths matter — the same logic behind the password-search demo.",
+        going_deeper="The password/key brute-force demo generalises this to arbitrary synthetic keys; Grover-SAT shows "
+                     "the oracle-building pattern.",
+        references=[{"title": "Enigma machine", "url": "https://en.wikipedia.org/wiki/Enigma_machine"},
+                    {"title": "Grover's algorithm", "url": "https://en.wikipedia.org/wiki/Grover%27s_algorithm"}],
+        prerequisites=["grover", "grover_sat"],
+    )
     title = "Enigma: Grover search for the rotor start window"
     category = "Enigma"
     summary = "Encrypt a message, then let Grover's algorithm find which of 2^b candidate start windows was used."
@@ -109,6 +135,27 @@ class EnigmaGrover(Experiment):
 @register
 class EnigmaKeySheet(Experiment):
     id = "enigma_keysheet"
+    tutor = Tutor(
+        concept="A playful mash-up of history and physics: generate a WWII-style Enigma daily key sheet using true "
+                "quantum randomness measured from qubits, then encrypt a message with day one's settings.",
+        how_it_works="Measure |+⟩ qubits to get a stream of random bits, then use rejection sampling (to avoid bias) to "
+                     "choose rotor order, ring settings, plugboard pairs and start windows for each day. If the quantum "
+                     "bits run out, a classical CSPRNG fills in, and the report says how many bits came from each source.",
+        intuition="Key material is only as strong as its randomness. Historically, predictable operator habits helped "
+                  "break Enigma; here the keys come from a source with no pattern to exploit.",
+        misconception="Quantum-random keys don't make Enigma secure — the cipher itself is broken. The lesson is about "
+                      "the RANDOMNESS SOURCE, which matters for any cipher, modern ones included.",
+        what_to_look_for="A valid key sheet, a correct encrypt/decrypt round-trip with day one's settings, and the "
+                         "quantum-vs-fallback bit tally.",
+        try_this=["Increase qubits per shot for more quantum bits and fewer fallbacks.",
+                  "Run on ibm:fake_fez to source the randomness from a device model.",
+                  "Generate 31 days and inspect the variety of rotor/plugboard choices."],
+        real_world_use="Hardware quantum RNGs seed real cryptographic keys today; weak randomness is a recurring cause "
+                       "of real-world crypto failures.",
+        going_deeper="The QRNG experiment covers randomness extraction and statistical testing in depth.",
+        references=[{"title": "Enigma machine", "url": "https://en.wikipedia.org/wiki/Enigma_machine"}],
+        prerequisites=["qrng"],
+    )
     title = "Quantum-random Enigma key sheet"
     category = "Enigma"
     summary = "Generate a daily key sheet from measured quantum random bits, then encrypt a message with day 1."

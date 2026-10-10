@@ -14,6 +14,7 @@
     <button data-tab="dashboard" class="active" role="tab">Overview</button>
     <button data-tab="lab" role="tab">Circuit Lab</button>
     <button data-tab="experiments" role="tab">Experiments</button>
+    <button data-tab="tutor" role="tab">Tutor</button>
     <button data-tab="enigma" role="tab">Enigma</button>
     <button data-tab="jobs" role="tab">Jobs</button>
     <button data-tab="settings" role="tab">IBM &amp; Cloud</button>
@@ -119,7 +120,8 @@
               <label class="chk"><input type="checkbox" id="ibmOverride"> override caps</label>
             </div>
           </details>
-          <div class="row gap">
+          <div class="row gap wrap">
+            <button id="expLearn" class="ghost">📘 Learn</button>
             <button id="expPreview" class="ghost">Preview circuits</button>
             <button id="expPreflight" class="ghost">Preflight</button>
             <button id="expRun" class="primary">Run experiment</button>
@@ -127,6 +129,24 @@
           </div>
         </div>
         <div id="expOutput"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ TUTOR -->
+  <section id="tab-tutor" class="tab">
+    <div class="card">
+      <h1>Quantum Tutor</h1>
+      <p>A guided path from "what is a qubit" to real-world applications. Each lesson ends with an experiment to run — and every experiment has its own in-depth tutor (open one from the <b>Experiments</b> tab, then press <b>Learn</b>).</p>
+    </div>
+    <div class="split">
+      <aside class="card list" id="tutorList"></aside>
+      <div class="grow">
+        <div class="card" id="lessonDetail"><p class="muted">Choose a lesson, or open the glossary below.</p></div>
+        <div class="card">
+          <div class="row gap"><h2 class="grow">Glossary</h2><input id="glossarySearch" placeholder="filter terms…"></div>
+          <div id="glossary" class="glossary"></div>
+        </div>
       </div>
     </div>
   </section>
