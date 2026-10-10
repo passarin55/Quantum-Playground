@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets — never commit credentials
+.env
+.env.*
+!.env.example
+*.secret
+qiskit-ibm.json
+
+# Local runtime data (job store, exported reports)
+.qplay/
+qplay_home/
+*.sqlite
+*.sqlite3
+reports/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

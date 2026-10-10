@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quantum Playground Studio</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%237c6cf0' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%237c6cf0'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo" aria-hidden="true">⟨ψ⟩</span> Quantum Playground <span class="muted" id="version"></span></div>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button data-tab="dashboard" class="active" role="tab">Overview</button>
+    <button data-tab="lab" role="tab">Circuit Lab</button>
+    <button data-tab="experiments" role="tab">Experiments</button>
+    <button data-tab="enigma" role="tab">Enigma</button>
+    <button data-tab="jobs" role="tab">Jobs</button>
+    <button data-tab="settings" role="tab">IBM &amp; Cloud</button>
+  </nav>
+  <button class="ghost" id="themeToggle" title="Toggle light/dark">◐</button>
+</header>
+
+<main>
+  <!-- ================================================================ OVERVIEW -->
+  <section id="tab-dashboard" class="tab active">
+    <div class="hero card">
+      <h1>Quantum Playground Studio</h1>
+      <p>Simulate, compose and run quantum experiments locally, on calibrated device models, or on real IBM Quantum hardware — plus a complete historical Enigma lab with a reversible Grover key-search oracle.</p>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Backends</h2>
+        <table class="tbl" id="backendTable"></table>
+      </div>
+      <div class="card">
+        <h2>Quick start</h2>
+        <ol class="steps">
+          <li><b>Circuit Lab</b> — drag-free composer with live amplitudes and Bloch spheres.</li>
+          <li><b>Experiments</b> — 21 self-verifying experiments (CHSH, teleportation, Shor, VQE, BB84 …).</li>
+          <li>Pick <code>ibm:fake_fez</code> to rehearse the exact IBM pipeline offline with real calibration noise.</li>
+          <li>Add your IBM Cloud API key under <b>IBM &amp; Cloud</b>, preflight, then submit with confirmation.</li>
+          <li>Cloud jobs land in <b>Jobs</b> and are analysed automatically when they finish — even in a later session.</li>
+        </ol>
+        <p class="muted small">Credentials stay in memory unless you explicitly save them to Qiskit's account store (~/.qiskit). Nothing is written to the project folder.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ CIRCUIT LAB -->
+  <section id="tab-lab" class="tab">
+    <div class="card">
+      <div class="row wrap gap">
+        <h2 class="grow">Circuit composer</h2>
+        <label>Qubits <input type="number" id="labQubits" min="1" max="8" value="3" class="num"></label>
+        <label>Columns <input type="number" id="labCols" min="4" max="40" value="14" class="num"></label>
+        <select id="labPreset" aria-label="Preset circuits">
+          <option value="">Presets…</option>
+          <option value="bell">Bell pair</option>
+          <option value="ghz">GHZ</option>
+          <option value="grover2">Grover (2 qubits, |11⟩)</option>
+          <option value="qft3">QFT of |5⟩ (3 qubits)</option>
+          <option value="phase">Phase kickback</option>
+          <option value="w">Superposition + T gates</option>
+        </select>
+        <button class="ghost" id="labClear">Clear</button>
+      </div>
+      <div class="palette" id="palette"></div>
+      <div class="row gap small muted" id="paletteHint">Select a gate, then click a cell. Multi-qubit gates: click control(s) first, then the target — all in the same column.</div>
+      <div class="composer-wrap"><div id="composer" class="composer"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Probabilities <span class="muted small" id="labProfile"></span></h3>
+        <div id="labProbs" class="chart"></div>
+        <h3>Bloch spheres <span class="muted small">(reduced single-qubit states)</span></h3>
+        <div id="labBloch" class="bloch-row"></div>
+      </div>
+      <div class="card">
+        <h3>Amplitudes</h3>
+        <div id="labAmps" class="scroll"></div>
+        <details><summary>OpenQASM 3</summary><pre id="labQasm" class="code"></pre></details>
+        <details><summary>Text drawing</summary><pre id="labDraw" class="code"></pre></details>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row wrap gap">
+        <h3 class="grow">Run on a backend</h3>
+        <select id="labBackend" class="backend-select"></select>
+        <label>Shots <input type="number" id="labShots" value="2000" min="1" max="100000" class="num"></label>
+        <label class="chk"><input type="checkbox" id="labConfirm"> confirm real QPU</label>
+        <button id="labRun" class="primary">Run</button>
+      </div>
+      <div id="labReport"></div>
+    </div>
+  </section>
+
+  <!-- ================================================================ EXPERIMENTS -->
+  <section id="tab-experiments" class="tab">
+    <div class="split">
+      <aside class="card list" id="expList"></aside>
+      <div class="grow">
+        <div class="card" id="expDetail"><p class="muted">Choose an experiment.</p></div>
+        <div class="card hidden" id="expRunCard">
+          <div class="row wrap gap">
+            <select id="expBackend" class="backend-select" aria-label="Backend"></select>
+            <label>Shots <input type="number" id="expShots" class="num" min="1" max="200000"></label>
+            <label class="chk"><input type="checkbox" id="expMitigate"> readout mitigation</label>
+            <label class="chk"><input type="checkbox" id="expConfirm"> confirm real QPU</label>
+          </div>
+          <details class="ibmopts"><summary>IBM transpiler &amp; safety options</summary>
+            <div class="row wrap gap">
+              <label>Opt. level <select id="ibmLevel"><option>0</option><option>1</option><option selected>2</option><option>3</option></select></label>
+              <label>Seeds <input type="number" id="ibmSeeds" class="num" min="1" max="5" value="3"></label>
+              <label>Max native 2q gates <input type="number" id="ibmMax2q" class="num" min="1" value="3000"></label>
+              <label class="chk"><input type="checkbox" id="ibmDD"> dynamical decoupling</label>
+              <label class="chk"><input type="checkbox" id="ibmTwirl"> twirling</label>
+              <label class="chk"><input type="checkbox" id="ibmOverride"> override caps</label>
+            </div>
+          </details>
+          <div class="row gap">
+            <button id="expPreview" class="ghost">Preview circuits</button>
+            <button id="expPreflight" class="ghost">Preflight</button>
+            <button id="expRun" class="primary">Run experiment</button>
+            <span id="expBusy" class="muted"></span>
+          </div>
+        </div>
+        <div id="expOutput"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ ENIGMA -->
+  <section id="tab-enigma" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <h2>Machine settings</h2>
+        <div class="form-grid">
+          <label>Model <select id="enModel"><option value="M3">Enigma I / M3</option><option value="M4">M4 (Kriegsmarine)</option></select></label>
+          <label>Reflector <select id="enReflector"></select></label>
+          <div class="rotors" id="enRotors"></div>
+          <label class="full">Plugboard <input id="enPlug" placeholder="e.g. AV BS CG DL FU HZ IN KM OW RX"></label>
+        </div>
+        <div class="windows" id="enWindows" aria-label="Rotor windows"></div>
+        <p class="muted small" id="enDescribe"></p>
+      </div>
+      <div class="card">
+        <h2>Encode / decode</h2>
+        <textarea id="enInput" rows="4" placeholder="Type plaintext or ciphertext…">HELLO WORLD</textarea>
+        <label class="chk"><input type="checkbox" id="enKeep"> keep spaces &amp; punctuation</label>
+        <div class="output mono" id="enOutput"></div>
+        <div class="lampboard" id="lampboard"></div>
+        <div class="path" id="enPath"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Classical crib scan</h2>
+        <p class="muted small">Tests every rotor start window (26³ for M3, 26⁴ for M4) with the other settings fixed — the honest classical baseline for the quantum search.</p>
+        <label>Ciphertext <input id="scanCipher" class="mono"></label>
+        <label>Known plaintext prefix (crib) <input id="scanCrib" class="mono"></label>
+        <button id="scanRun">Scan</button>
+        <div id="scanOut"></div>
+      </div>
+      <div class="card">
+        <h2>Quantum key search (Grover)</h2>
+        <p class="muted small">Uses the settings on the left; the right rotor's start window is the unknown. The oracle runs the real Enigma permutation coherently on all 32 basis states of a 5-qubit letter register.</p>
+        <div class="row wrap gap">
+          <label>Key qubits <input type="number" id="qKeyBits" class="num" min="1" max="4" value="2"></label>
+          <label>First candidate <input id="qFirst" class="num mono" value="A" maxlength="1"></label>
+          <label>Crib letters <input type="number" id="qCrib" class="num" min="1" max="3" value="1"></label>
+          <label>Synthesis <select id="qSynth"><option>auto</option><option>compiled</option><option>staged</option><option>factored</option></select></label>
+        </div>
+        <div class="row wrap gap">
+          <select id="qBackend" class="backend-select"></select>
+          <label class="chk"><input type="checkbox" id="qConfirm"> confirm real QPU</label>
+          <button id="qCompare" class="ghost">Compare oracle synthesis</button>
+          <button id="qRun" class="primary">Run Grover search</button>
+        </div>
+        <div id="qOut"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ JOBS -->
+  <section id="tab-jobs" class="tab">
+    <div class="card">
+      <div class="row gap"><h2 class="grow">Job store</h2><button id="jobsReload" class="ghost">Reload</button></div>
+      <div class="scroll"><table class="tbl" id="jobsTable"></table></div>
+    </div>
+    <div id="jobDetail"></div>
+  </section>
+
+  <!-- ================================================================ SETTINGS -->
+  <section id="tab-settings" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <h2>IBM Quantum Platform</h2>
+        <p class="muted small">Use an IBM Cloud API key from quantum.cloud.ibm.com. Optionally give the instance CRN (otherwise the first available instance is used).</p>
+        <label>API key <input type="password" id="ibmToken" autocomplete="off" placeholder="paste API key"></label>
+        <label>Instance CRN (optional) <input id="ibmInstance" placeholder="crn:v1:bluemix:public:quantum-computing:…"></label>
+        <div class="row gap wrap">
+          <button id="ibmUse" class="primary">Use for this session</button>
+          <button id="ibmSave" class="ghost">Save to Qiskit account (~/.qiskit)</button>
+          <button id="ibmClear" class="ghost">Forget session key</button>
+        </div>
+        <pre id="ibmStatus" class="code"></pre>
+        <button id="ibmDevices">List devices</button>
+        <div id="ibmDeviceList"></div>
+      </div>
+      <div class="card">
+        <h2>Safety rails</h2>
+        <ul class="steps">
+          <li>Real-QPU submissions always need an explicit confirmation.</li>
+          <li>Every submission is transpiled first; circuits above the native two-qubit cap are blocked unless you override.</li>
+          <li><code>ibm:fake_*</code> runs the identical pipeline locally with the device's calibrated noise — rehearse there first.</li>
+          <li>The calibration "error product" is an illustration (independent errors), not a fidelity prediction.</li>
+        </ul>
+        <h2>AWS Braket</h2>
+        <p class="muted small"><code>braket:local</code> runs Braket's simulator offline. Managed devices use your normal AWS credential chain (<code>AWS_PROFILE</code>) and the spec <code>braket:&lt;device ARN&gt;</code> from the CLI.</p>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
