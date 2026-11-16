@@ -549,7 +549,9 @@ def b_gate(mb, rng, x, y, w, d, h, fac, neon):
         cx = s * (ww / 2 - leg / 2)
         mb.prism(r(cx, 0, 0, leg, dd), r(cx, 0, hh, leg, dd), fac)
         # inner neon edge
-        mb.prism(r(s * (ww / 2 - leg) - s * 0.3, 0, 0, 0.6, dd + 0.6), r(s * (ww / 2 - leg) - s * 0.3, 0, hh, 0.6, dd + 0.6), neon, None)
+        for e in (-1, 1):
+            ex = s * (ww / 2 - leg) - s * 0.3
+            mb.prism(r(ex, e * dd / 2, 0, 0.6, 0.6), r(ex, e * dd / 2, hh, 0.6, 0.6), neon, None)
     mb.prism(r(0, 0, hh, ww, dd), r(0, 0, h, ww, dd), fac, "roof", "metal")
     mb.prism(r(0, 0, hh - 0.8, ww - 2 * leg, dd + 0.6), r(0, 0, hh, ww - 2 * leg, dd + 0.6), neon, None, neon)
     for _ in range(rng.randint(1, 3)):
